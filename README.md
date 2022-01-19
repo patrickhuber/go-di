@@ -1,6 +1,14 @@
 # di
 a go runtime dependency injection framework
 
+## features
+
+* Supports lifetimes of static and per request
+* Constructors injection with dependency resolution of parameters
+* Constructor injection supports error return types with 
+* Constructor injection supports multiple instances of same interface type
+* Constructor injection supports array and multi-variate parameters 
+
 ## getting started
 
 ```bash
@@ -66,3 +74,7 @@ if !ok{
 }
 fmt.Println("The name is %s", namer.Name())
 ```
+
+## examples
+
+See the [unit tests](container_test.go) for more examples. 
