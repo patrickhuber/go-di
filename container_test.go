@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	. "github.com/onsi/ginkgo"
+	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/patrickhuber/di"
 )
@@ -195,20 +195,37 @@ var _ = Describe("Container", func() {
 		err := container.RegisterConstructor(func() {})
 		Expect(err).ToNot(BeNil())
 	})
-	It("can register static lifetime", func() {
-		container := di.NewContainer()
-		err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
-		Expect(err).To(BeNil())
-		obj, err := container.Resolve(StorageType)
-		Expect(err).To(BeNil())
-		storage, ok := obj.(Storage)
-		Expect(ok).To(BeTrue())
-		storage.Set(1, "test")
-		obj, err = container.Resolve(StorageType)
-		Expect(err).To(BeNil())
-		storage, ok = obj.(Storage)
-		Expect(ok).To(BeTrue())
-		value := storage.Get(1)
-		Expect(value).To(Equal("test"))
+	Context("lifetime", func() {
+		var (
+			container di.Container
+		)
+		It("can register default lifetime", func() {
+			container = di.NewContainer(di.WithLifetime(di.LifetimeStatic))
+			err := container.RegisterConstructor(NewStorage)
+			Expect(err).To(BeNil())
+		})
+		It("can register lifetime", func() {
+			container = di.NewContainer()
+			err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
+			Expect(err).To(BeNil())
+		})
+		It("can override default lifetime", func() {
+			container = di.NewContainer(di.WithLifetime(di.LifetimePerRequest))
+			err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
+			Expect(err).To(BeNil())
+		})
+		AfterEach(func() {
+			obj, err := container.Resolve(StorageType)
+			Expect(err).To(BeNil())
+			storage, ok := obj.(Storage)
+			Expect(ok).To(BeTrue())
+			storage.Set(1, "test")
+			obj, err = container.Resolve(StorageType)
+			Expect(err).To(BeNil())
+			storage, ok = obj.(Storage)
+			Expect(ok).To(BeTrue())
+			value := storage.Get(1)
+			Expect(value).To(Equal("test"))
+		})
 	})
 })

@@ -12,35 +12,52 @@ const (
 	LifetimePerRequest Lifetime = 1
 )
 
+// Container represents a dependency injection container
 type Container interface {
+	// RegisterInstance registers a type with a single instace with the given registration options
 	RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption)
+
+	// RegisterDynamic registers a type with a dynamic resolver
 	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption)
+
+	// RegisterConstructor registers a type dynamically by instpecting the constructor signature
 	RegisterConstructor(constructor interface{}, options ...RegistrationOption) error
+
+	// Resolver is required as a Container must allow resolution
 	Resolver
 }
 
 type FuncResolver func(Resolver) (interface{}, error)
 
 type container struct {
-	data  map[string][]FuncResolver
-	cache map[string][]interface{}
+	data           map[string][]FuncResolver
+	cache          map[string][]interface{}
+	defaultOptions []RegistrationOption
 }
 
 type RegistrationOption func(*container, reflect.Type)
 
+// WithLifetime sets the lifetime of the registration
 func WithLifetime(lifetime Lifetime) RegistrationOption {
 	return func(c *container, t reflect.Type) {
+		// if the lifetime is per request, make sure to clear any static lifetimes that were set
+		if lifetime == LifetimePerRequest {
+			delete(c.cache, t.String())
+		}
+		// if the lifetime is static, set the cache key to cache the first invocation
 		if lifetime == LifetimeStatic {
 			c.cache[t.String()] = nil
 		}
 	}
 }
 
-func NewContainer() Container {
+// NewContainer returns a new container with the specified default options applied to all objects registered in the container
+func NewContainer(options ...RegistrationOption) Container {
 
 	return &container{
-		data:  map[string][]FuncResolver{},
-		cache: map[string][]interface{}{},
+		data:           map[string][]FuncResolver{},
+		cache:          map[string][]interface{}{},
+		defaultOptions: options,
 	}
 }
 
@@ -122,6 +139,12 @@ func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, optio
 	}
 	delegates = append(delegates, delegate)
 	c.data[t.String()] = delegates
+
+	// apply the default options
+	for _, option := range c.defaultOptions {
+		option(c, t)
+	}
+	// apply the override options
 	for _, option := range options {
 		option(c, t)
 	}
