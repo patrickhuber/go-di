@@ -124,14 +124,33 @@ var _ = Describe("Container", func() {
 	It("can register constructor", func() {
 		container := di.NewContainer()
 		name := "myname"
+
 		container.RegisterInstance(StringType, name)
 		container.RegisterConstructor(NewSample)
+
 		instance, err := container.Resolve(SampleInterfaceType)
 		Expect(err).To(BeNil())
 		Expect(instance).ToNot(BeNil())
+
 		sample, ok := instance.(SampleInterface)
 		Expect(ok).To(BeTrue())
 		Expect(sample.Name()).To(Equal(name))
+	})
+	It("can register dynamic", func() {
+		container := di.NewContainer()
+		name := "myname"
+		container.RegisterDynamic(StringType, func(r di.Resolver) (interface{}, error) {
+			return name, nil
+		})
+
+		instance, err := container.Resolve(StringType)
+		Expect(err).To(BeNil())
+		Expect(instance).ToNot(BeNil())
+
+		value, ok := instance.(string)
+		Expect(ok).To(BeTrue())
+		Expect(value).To(Equal(name))
+
 	})
 	It("can register array parameter", func() {
 		container := di.NewContainer()
@@ -141,8 +160,8 @@ var _ = Describe("Container", func() {
 		}
 		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
 		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		err := container.RegisterConstructor(NewAggregate)
-		Expect(err).To(BeNil())
+		container.RegisterConstructor(NewAggregate)
+
 		instance, err := container.Resolve(AggregateInterfaceType)
 		Expect(err).To(BeNil())
 		Expect(instance).ToNot(BeNil())
@@ -159,8 +178,8 @@ var _ = Describe("Container", func() {
 		}
 		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
 		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		err := container.RegisterConstructor(NewVariadic)
-		Expect(err).To(BeNil())
+		container.RegisterConstructor(NewVariadic)
+
 		instance, err := container.Resolve(AggregateInterfaceType)
 		Expect(err).To(BeNil())
 		Expect(instance).ToNot(BeNil())
@@ -169,19 +188,24 @@ var _ = Describe("Container", func() {
 	})
 	It("can invoke constructor that returns error", func() {
 		container := di.NewContainer()
+
 		err := container.RegisterConstructor(NewWithError)
 		Expect(err).To(BeNil())
+
 		i, err := container.Resolve(SampleInterfaceType)
 		Expect(err).ToNot(BeNil())
 		Expect(i).To(BeNil())
 	})
 	It("can invoke constructor that returns value and nil error", func() {
 		container := di.NewContainer()
+
 		err := container.RegisterConstructor(NewWithNilError)
 		Expect(err).To(BeNil())
+
 		i, err := container.Resolve(SampleInterfaceType)
 		Expect(err).To(BeNil())
 		Expect(i).ToNot(BeNil())
+
 		_, ok := i.(SampleInterface)
 		Expect(ok).To(BeTrue())
 	})
@@ -217,13 +241,17 @@ var _ = Describe("Container", func() {
 		AfterEach(func() {
 			obj, err := container.Resolve(StorageType)
 			Expect(err).To(BeNil())
+
 			storage, ok := obj.(Storage)
 			Expect(ok).To(BeTrue())
 			storage.Set(1, "test")
+
 			obj, err = container.Resolve(StorageType)
 			Expect(err).To(BeNil())
+
 			storage, ok = obj.(Storage)
 			Expect(ok).To(BeTrue())
+
 			value := storage.Get(1)
 			Expect(value).To(Equal("test"))
 		})
