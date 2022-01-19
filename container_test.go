@@ -126,7 +126,8 @@ var _ = Describe("Container", func() {
 		name := "myname"
 
 		container.RegisterInstance(StringType, name)
-		container.RegisterConstructor(NewSample)
+		err := container.RegisterConstructor(NewSample)
+		Expect(err).To(BeNil())
 
 		instance, err := container.Resolve(SampleInterfaceType)
 		Expect(err).To(BeNil())
@@ -160,7 +161,8 @@ var _ = Describe("Container", func() {
 		}
 		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
 		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		container.RegisterConstructor(NewAggregate)
+		err := container.RegisterConstructor(NewAggregate)
+		Expect(err).To(BeNil())
 
 		instance, err := container.Resolve(AggregateInterfaceType)
 		Expect(err).To(BeNil())
@@ -178,7 +180,8 @@ var _ = Describe("Container", func() {
 		}
 		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
 		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		container.RegisterConstructor(NewVariadic)
+		err := container.RegisterConstructor(NewVariadic)
+		Expect(err).To(BeNil())
 
 		instance, err := container.Resolve(AggregateInterfaceType)
 		Expect(err).To(BeNil())
