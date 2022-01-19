@@ -53,7 +53,7 @@ person := NewPerson("james")
 // register the concrete type as a Namer interface.
 container.RegisterInstance(NamerType, person)
 
-// get the implementation for NamerTypej, instance is an interface{} so it must be cast
+// get the implementation for NamerType, instance is an interface{} so it must be cast
 instance, err := container.Resolve(NamerType)
 if err != nil{
   log.Fatal(err)
