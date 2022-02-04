@@ -1,4 +1,4 @@
-module github.com/patrickhuber/di
+module github.com/patrickhuber/go-di
 
 go 1.17
 
