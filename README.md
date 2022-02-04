@@ -12,7 +12,7 @@ a go runtime dependency injection framework
 ## getting started
 
 ```bash
-go get github.com/patrickhuber/di
+go get github.com/patrickhuber/go-di@latest
 ```
 
 ## usage
@@ -22,7 +22,7 @@ Define a type and interface that will be used in registration
 ```golang
 import(
   "log"
-  "github.com/patrickhuber/di"
+  "github.com/patrickhuber/go-di"
 )
 
 // Namer
