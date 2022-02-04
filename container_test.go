@@ -6,7 +6,7 @@ import (
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/patrickhuber/di"
+	"github.com/patrickhuber/go-di"
 )
 
 type SampleStruct struct {
