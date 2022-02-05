@@ -1,6 +1,7 @@
 package di
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 )
@@ -12,13 +13,17 @@ const (
 	LifetimePerRequest Lifetime = 1
 )
 
+var (
+	ErrNotExist = errors.New("item does not exist")
+)
+
 // Container represents a dependency injection container
 type Container interface {
 	// RegisterInstance registers a type with a single instace with the given registration options
-	RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption)
+	RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption) InstanceRegistration
 
 	// RegisterDynamic registers a type with a dynamic resolver
-	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption)
+	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption) InstanceRegistration
 
 	// RegisterConstructor registers a type dynamically by instpecting the constructor signature
 	RegisterConstructor(constructor interface{}, options ...RegistrationOption) error
@@ -30,9 +35,32 @@ type Container interface {
 type FuncResolver func(Resolver) (interface{}, error)
 
 type container struct {
-	data           map[string][]FuncResolver
-	cache          map[string][]interface{}
+	data  map[string][]FuncResolver
+	cache map[string][]interface{}
+	// nameLookup looks up by [type][name][index] where index is the position in the data[type][] array
+	nameLookup     map[string]map[string]int
 	defaultOptions []RegistrationOption
+}
+
+type InstanceRegistration interface {
+	// WithKey sets a key for the given type. Key lookup can be done with ResolveByKey
+	WithKey(key string) InstanceRegistration
+}
+
+type instanceRegistration struct {
+	c     *container
+	t     reflect.Type
+	index int
+}
+
+func (r *instanceRegistration) WithKey(key string) InstanceRegistration {
+	nameToIndex, ok := r.c.nameLookup[r.t.String()]
+	if !ok {
+		nameToIndex = map[string]int{}
+		r.c.nameLookup[r.t.String()] = nameToIndex
+	}
+	nameToIndex[key] = r.index
+	return r
 }
 
 type RegistrationOption func(*container, reflect.Type)
@@ -57,6 +85,7 @@ func NewContainer(options ...RegistrationOption) Container {
 	return &container{
 		data:           map[string][]FuncResolver{},
 		cache:          map[string][]interface{}{},
+		nameLookup:     map[string]map[string]int{},
 		defaultOptions: options,
 	}
 }
@@ -132,7 +161,7 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Regi
 	return nil
 }
 
-func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption) {
+func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption) InstanceRegistration {
 	delegates, ok := c.data[t.String()]
 	if !ok {
 		delegates = []FuncResolver{}
@@ -148,10 +177,16 @@ func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, optio
 	for _, option := range options {
 		option(c, t)
 	}
+
+	return &instanceRegistration{
+		c:     c,
+		t:     t,
+		index: len(delegates) - 1,
+	}
 }
 
-func (c *container) RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption) {
-	c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
+func (c *container) RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption) InstanceRegistration {
+	return c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
 		return instance, nil
 	}, options...)
 }
@@ -162,6 +197,25 @@ func (c *container) Resolve(t reflect.Type) (interface{}, error) {
 		return nil, err
 	}
 	return results[0], nil
+}
+
+func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, error) {
+	results, err := c.ResolveAll(t)
+	if err != nil {
+		return nil, err
+	}
+	indexMap, typeExists := c.nameLookup[t.String()]
+	if !typeExists {
+		return nil, ErrNotExist
+	}
+	index, nameExists := indexMap[name]
+	if !nameExists {
+		return nil, ErrNotExist
+	}
+	if index >= len(results) {
+		return nil, ErrNotExist
+	}
+	return results[index], nil
 }
 
 func (c *container) ResolveAll(t reflect.Type) ([]interface{}, error) {

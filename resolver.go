@@ -10,4 +10,7 @@ type Resolver interface {
 
 	// ResolveAll resolves all instances registered for the given type
 	ResolveAll(t reflect.Type) ([]interface{}, error)
+
+	// ResolveByName resolves the instance registered for a given type and name
+	ResolveByName(t reflect.Type, name string) (interface{}, error)
 }

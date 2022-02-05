@@ -222,6 +222,26 @@ var _ = Describe("Container", func() {
 		err := container.RegisterConstructor(func() {})
 		Expect(err).ToNot(BeNil())
 	})
+	It("can resolve all", func() {
+		container := di.NewContainer()
+		container.RegisterInstance(SampleInterfaceType, NewSample("one"))
+		container.RegisterInstance(SampleInterfaceType, NewSample("two"))
+		all, err := container.ResolveAll(SampleInterfaceType)
+		Expect(err).To(BeNil())
+		Expect(len(all)).To(Equal(2))
+	})
+	Context("key", func() {
+		It("can resolve by key", func() {
+			container := di.NewContainer()
+			container.RegisterInstance(SampleInterfaceType, NewSample("one")).
+				WithKey("one")
+			container.RegisterInstance(SampleInterfaceType, NewSample("two")).
+				WithKey("two")
+			instance, err := container.ResolveByName(SampleInterfaceType, "two")
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
+		})
+	})
 	Context("lifetime", func() {
 		var (
 			container di.Container

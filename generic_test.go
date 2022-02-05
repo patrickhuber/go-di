@@ -66,4 +66,26 @@ var _ = Describe("Generic", func() {
 		Expect(err).To(BeNil())
 		Expect(len(instances)).To(Equal(2))
 	})
+	It("can resolve by name", func() {
+		container := di.NewContainer()
+		runner1 := NewRunner()
+		runner2 := NewRunner()
+
+		container.RegisterInstance(RunnerType, runner1).WithKey("runner1")
+		container.RegisterInstance(RunnerType, runner2).WithKey("runner2")
+		instance, err := di.ResolveByName[Runner](container, "runner1")
+
+		Expect(err).To(BeNil())
+		Expect(instance).ToNot(BeNil())
+	})
+	It("can register name", func() {
+
+		container := di.NewContainer()
+		runner := NewRunner()
+		di.RegisterInstance(container, runner).WithKey("runner1")
+		instance, err := di.ResolveByName[Runner](container, "runner1")
+
+		Expect(err).To(BeNil())
+		Expect(instance).ToNot(BeNil())
+	})
 })
