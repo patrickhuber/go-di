@@ -7,15 +7,15 @@ import (
 	"reflect"
 )
 
-func RegisterInstance[T any](container Container, instance T, options ...RegistrationOption) InstanceRegistration {
+func RegisterInstance[T any](container Container, instance T, options ...InstanceRegistrationOption) {
 	t := reflect.TypeOf((*T)(nil)).Elem()
-	return container.RegisterInstance(t, instance, options...)
+	container.RegisterInstance(t, instance, options...)
 }
 
-func RegisterDynamic[T any](container Container, delegate func(Resolver) (T, error), options ...RegistrationOption) InstanceRegistration {
+func RegisterDynamic[T any](container Container, delegate func(Resolver) (T, error), options ...InstanceRegistrationOption) {
 	t := reflect.TypeOf((*T)(nil)).Elem()
 
-	return container.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
+	container.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
 		return delegate(r)
 	}, options...)
 }

@@ -20,13 +20,13 @@ var (
 // Container represents a dependency injection container
 type Container interface {
 	// RegisterInstance registers a type with a single instace with the given registration options
-	RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption) InstanceRegistration
+	RegisterInstance(t reflect.Type, instance interface{}, options ...InstanceRegistrationOption)
 
 	// RegisterDynamic registers a type with a dynamic resolver
-	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption) InstanceRegistration
+	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption)
 
 	// RegisterConstructor registers a type dynamically by instpecting the constructor signature
-	RegisterConstructor(constructor interface{}, options ...RegistrationOption) error
+	RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error
 
 	// Resolver is required as a Container must allow resolution
 	Resolver
@@ -39,34 +39,23 @@ type container struct {
 	cache map[string][]interface{}
 	// nameLookup looks up by [type][name][index] where index is the position in the data[type][] array
 	nameLookup     map[string]map[string]int
-	defaultOptions []RegistrationOption
+	defaultOptions []DefaultRegistrationOption
 }
 
-type InstanceRegistration interface {
-	// WithKey sets a key for the given type. Key lookup can be done with ResolveByKey
-	WithKey(key string) InstanceRegistration
-}
-
-type instanceRegistration struct {
-	c     *container
-	t     reflect.Type
-	index int
-}
-
-func (r *instanceRegistration) WithKey(key string) InstanceRegistration {
-	nameToIndex, ok := r.c.nameLookup[r.t.String()]
-	if !ok {
-		nameToIndex = map[string]int{}
-		r.c.nameLookup[r.t.String()] = nameToIndex
-	}
-	nameToIndex[key] = r.index
-	return r
-}
-
-type RegistrationOption func(*container, reflect.Type)
+type InstanceRegistrationOption func(*container, reflect.Type)
+type DefaultRegistrationOption func(*container, reflect.Type)
 
 // WithLifetime sets the lifetime of the registration
-func WithLifetime(lifetime Lifetime) RegistrationOption {
+func WithLifetime(lifetime Lifetime) InstanceRegistrationOption {
+	return withLifetime(lifetime)
+}
+
+// WithDefaultLifetime sets the lifetime of the registration
+func WithDefaultLifetime(lifetime Lifetime) DefaultRegistrationOption {
+	return withLifetime(lifetime)
+}
+
+func withLifetime(lifetime Lifetime) func(c *container, t reflect.Type) {
 	return func(c *container, t reflect.Type) {
 		// if the lifetime is per request, make sure to clear any static lifetimes that were set
 		if lifetime == LifetimePerRequest {
@@ -79,8 +68,21 @@ func WithLifetime(lifetime Lifetime) RegistrationOption {
 	}
 }
 
+func WithKey(key string) InstanceRegistrationOption {
+	return func(c *container, t reflect.Type) {
+		nameToIndex, ok := c.nameLookup[t.String()]
+		if !ok {
+			nameToIndex = map[string]int{}
+			c.nameLookup[t.String()] = nameToIndex
+		}
+
+		index := len(c.data[t.String()]) - 1
+		nameToIndex[key] = index
+	}
+}
+
 // NewContainer returns a new container with the specified default options applied to all objects registered in the container
-func NewContainer(options ...RegistrationOption) Container {
+func NewContainer(options ...DefaultRegistrationOption) Container {
 
 	return &container{
 		data:           map[string][]FuncResolver{},
@@ -90,7 +92,7 @@ func NewContainer(options ...RegistrationOption) Container {
 	}
 }
 
-func (c *container) RegisterConstructor(constructor interface{}, options ...RegistrationOption) error {
+func (c *container) RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error {
 	t := reflect.TypeOf(constructor)
 	if t.Kind() != reflect.Func {
 		return fmt.Errorf("constructor '%s' must be a method", t.Elem())
@@ -161,7 +163,7 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Regi
 	return nil
 }
 
-func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...RegistrationOption) InstanceRegistration {
+func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption) {
 	delegates, ok := c.data[t.String()]
 	if !ok {
 		delegates = []FuncResolver{}
@@ -177,16 +179,10 @@ func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, optio
 	for _, option := range options {
 		option(c, t)
 	}
-
-	return &instanceRegistration{
-		c:     c,
-		t:     t,
-		index: len(delegates) - 1,
-	}
 }
 
-func (c *container) RegisterInstance(t reflect.Type, instance interface{}, options ...RegistrationOption) InstanceRegistration {
-	return c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
+func (c *container) RegisterInstance(t reflect.Type, instance interface{}, options ...InstanceRegistrationOption) {
+	c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
 		return instance, nil
 	}, options...)
 }

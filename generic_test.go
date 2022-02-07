@@ -71,8 +71,8 @@ var _ = Describe("Generic", func() {
 		runner1 := NewRunner()
 		runner2 := NewRunner()
 
-		container.RegisterInstance(RunnerType, runner1).WithKey("runner1")
-		container.RegisterInstance(RunnerType, runner2).WithKey("runner2")
+		container.RegisterInstance(RunnerType, runner1, di.WithKey("runner1"))
+		container.RegisterInstance(RunnerType, runner2, di.WithKey("runner2"))
 		instance, err := di.ResolveByName[Runner](container, "runner1")
 
 		Expect(err).To(BeNil())
@@ -82,7 +82,7 @@ var _ = Describe("Generic", func() {
 
 		container := di.NewContainer()
 		runner := NewRunner()
-		di.RegisterInstance(container, runner).WithKey("runner1")
+		di.RegisterInstance(container, runner, di.WithKey("runner1"))
 		instance, err := di.ResolveByName[Runner](container, "runner1")
 
 		Expect(err).To(BeNil())

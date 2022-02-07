@@ -233,10 +233,8 @@ var _ = Describe("Container", func() {
 	Context("key", func() {
 		It("can resolve by key", func() {
 			container := di.NewContainer()
-			container.RegisterInstance(SampleInterfaceType, NewSample("one")).
-				WithKey("one")
-			container.RegisterInstance(SampleInterfaceType, NewSample("two")).
-				WithKey("two")
+			container.RegisterInstance(SampleInterfaceType, NewSample("one"), di.WithKey("one"))
+			container.RegisterInstance(SampleInterfaceType, NewSample("two"), di.WithKey("two"))
 			instance, err := container.ResolveByName(SampleInterfaceType, "two")
 			Expect(err).To(BeNil())
 			Expect(instance).ToNot(BeNil())
@@ -247,7 +245,7 @@ var _ = Describe("Container", func() {
 			container di.Container
 		)
 		It("can register default lifetime", func() {
-			container = di.NewContainer(di.WithLifetime(di.LifetimeStatic))
+			container = di.NewContainer(di.WithDefaultLifetime(di.LifetimeStatic))
 			err := container.RegisterConstructor(NewStorage)
 			Expect(err).To(BeNil())
 		})
@@ -257,7 +255,7 @@ var _ = Describe("Container", func() {
 			Expect(err).To(BeNil())
 		})
 		It("can override default lifetime", func() {
-			container = di.NewContainer(di.WithLifetime(di.LifetimePerRequest))
+			container = di.NewContainer(di.WithDefaultLifetime(di.LifetimePerRequest))
 			err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
 			Expect(err).To(BeNil())
 		})
