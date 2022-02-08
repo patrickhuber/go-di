@@ -106,7 +106,7 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Inst
 	if outCount == 2 {
 		errorType := t.Out(1)
 		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-			return fmt.Errorf("if a constructor has two parameters, the second must implement error")
+			return fmt.Errorf("if a constructor has two return parameters, the second must implement error")
 		}
 	} else if outCount != 1 {
 		return fmt.Errorf("constructor must have a return value and optional error")

@@ -22,6 +22,7 @@ Define a type and interface that will be used in registration
 ```golang
 import(
   "log"
+  "fmt"
   "github.com/patrickhuber/go-di"
 )
 
@@ -78,3 +79,4 @@ fmt.Println("The name is %s", namer.Name())
 ## examples
 
 See the [unit tests](container_test.go) for more examples. 
+See the [generic unit tests](generic_test.go) for examples that use generics.
