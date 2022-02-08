@@ -63,6 +63,38 @@ func NewAggregate(dependencies []DependencyInterface) AggregateInterface {
 	}
 }
 
+type MapInterface interface {
+	Keys() []string
+	Lookup(name string) (DependencyInterface, bool)
+}
+
+type MapStruct struct {
+	items map[string]DependencyInterface
+}
+
+func (m *MapStruct) Keys() []string {
+	var keys []string
+	for k := range m.items {
+		keys = append(keys, k)
+	}
+	return keys
+}
+
+func (m *MapStruct) Lookup(key string) (DependencyInterface, bool) {
+	value, ok := m.items[key]
+	return value, ok
+}
+
+func NewMap(dependencies map[string]DependencyInterface) MapInterface {
+	items := map[string]DependencyInterface{}
+	for k, v := range dependencies {
+		items[k] = v
+	}
+	return &MapStruct{
+		items: items,
+	}
+}
+
 func NewWithNilError() (SampleInterface, error) {
 	return &SampleStruct{
 		name: "test",
@@ -108,6 +140,7 @@ var StringType = reflect.TypeOf((*string)(nil)).Elem()
 var SampleInterfaceType = reflect.TypeOf((*SampleInterface)(nil)).Elem()
 var DependencyInterfaceType = reflect.TypeOf((*DependencyInterface)(nil)).Elem()
 var AggregateInterfaceType = reflect.TypeOf((*AggregateInterface)(nil)).Elem()
+var MapInterfaceType = reflect.TypeOf((*MapInterface)(nil)).Elem()
 var StorageType = reflect.TypeOf((*Storage)(nil)).Elem()
 
 var _ = Describe("Container", func() {
@@ -188,6 +221,46 @@ var _ = Describe("Container", func() {
 		Expect(instance).ToNot(BeNil())
 		_, ok := instance.(AggregateInterface)
 		Expect(ok).To(BeTrue())
+	})
+	It("can register map parameter", func() {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		for _, d := range dependencies {
+			container.RegisterInstance(DependencyInterfaceType, d, di.WithKey(d.Name()))
+		}
+		err := container.RegisterConstructor(NewMap)
+		Expect(err).To(BeNil())
+
+		instance, err := container.Resolve(MapInterfaceType)
+		Expect(err).To(BeNil())
+		Expect(instance).ToNot(BeNil())
+
+		mapInstance, ok := instance.(MapInterface)
+		Expect(ok).To(BeTrue())
+		Expect(len(mapInstance.Keys())).To(Equal(2))
+	})
+	It("returns empty map when no keys specified", func() {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		for _, d := range dependencies {
+			container.RegisterInstance(DependencyInterfaceType, d)
+		}
+		err := container.RegisterConstructor(NewMap)
+		Expect(err).To(BeNil())
+
+		instance, err := container.Resolve(MapInterfaceType)
+		Expect(err).To(BeNil())
+		Expect(instance).ToNot(BeNil())
+
+		mapInstance, ok := instance.(MapInterface)
+		Expect(ok).To(BeTrue())
+		Expect(len(mapInstance.Keys())).To(Equal(0))
 	})
 	It("can invoke constructor that returns error", func() {
 		container := di.NewContainer()

@@ -134,6 +134,22 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Inst
 					}
 					values = append(values, slice)
 				}
+			} else if parameterType.Kind() == reflect.Map && parameterType.Key().Kind() == reflect.String {
+				keyType := parameterType.Key()
+				valueType := parameterType.Elem()
+				mapType := reflect.MapOf(keyType, valueType)
+				mapValue := reflect.MakeMap(mapType)
+				names, ok := c.nameLookup[valueType.String()]
+				if ok {
+					valueArray, err := r.ResolveAll(valueType)
+					if err != nil {
+						return nil, err
+					}
+					for name, index := range names {
+						mapValue.SetMapIndex(reflect.ValueOf(name), reflect.ValueOf(valueArray[index]))
+					}
+				}
+				values = append(values, mapValue)
 			} else {
 				value, err := r.Resolve(parameterType)
 				if err != nil {
