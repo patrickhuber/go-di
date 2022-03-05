@@ -8,6 +8,7 @@ a go runtime dependency injection framework
 * Constructor injection supports error return types with 
 * Constructor injection supports multiple instances of same interface type
 * Constructor injection supports array and multi-variate parameters 
+* Constructor injection supports map[string]type resolution for registrations WithName
 
 ## getting started
 
