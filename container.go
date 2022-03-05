@@ -222,7 +222,7 @@ func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, err
 	}
 	index, nameExists := indexMap[name]
 	if !nameExists {
-		return nil, ErrNotExist
+		return nil, fmt.Errorf("name %s does not exist for type %s :%w", name, t.String(), ErrNotExist)
 	}
 	if index >= len(results) {
 		return nil, ErrNotExist
