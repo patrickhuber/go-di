@@ -1,6 +1,8 @@
 package di
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // Resolver resolves an instance from a given type
 type Resolver interface {
@@ -11,6 +13,14 @@ type Resolver interface {
 	// ResolveAll resolves all instances registered for the given type
 	ResolveAll(t reflect.Type) ([]interface{}, error)
 
+	// ResolveMap resolves all named instances as a map
+	ResolveMap(t reflect.Type) (map[string]interface{}, error)
+
 	// ResolveByName resolves the instance registered for a given type and name
 	ResolveByName(t reflect.Type, name string) (interface{}, error)
+}
+
+type Invoker interface {
+	// Invoke the given function using the container to supply parameters
+	Invoke(delegate interface{}) (interface{}, error)
 }

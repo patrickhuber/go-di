@@ -30,6 +30,9 @@ type Container interface {
 
 	// Resolver is required as a Container must allow resolution
 	Resolver
+
+	// Invoker allows the container to invoke functions by using container parameters
+	Invoker
 }
 
 type FuncResolver func(Resolver) (interface{}, error)
@@ -94,87 +97,16 @@ func NewContainer(options ...DefaultRegistrationOption) Container {
 
 func (c *container) RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error {
 	t := reflect.TypeOf(constructor)
-	if t.Kind() != reflect.Func {
-		return fmt.Errorf("constructor '%s' must be a method", t.Elem())
-	}
-
-	outCount := t.NumOut()
-	if outCount == 0 {
-		return fmt.Errorf("constructor must have a return value and optional error")
-	}
-	returnType := t.Out(0)
-	if outCount == 2 {
-		errorType := t.Out(1)
-		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-			return fmt.Errorf("if a constructor has two return parameters, the second must implement error")
-		}
-	} else if outCount != 1 {
-		return fmt.Errorf("constructor must have a return value and optional error")
+	err := validateDelegateType(c, t)
+	if err != nil {
+		return err
 	}
 
 	delegate := func(r Resolver) (interface{}, error) {
-		inCount := t.NumIn()
-		values := []reflect.Value{}
-		for i := 0; i < inCount; i++ {
-			parameterType := t.In(i)
-			if parameterType.Kind() == reflect.Array || parameterType.Kind() == reflect.Slice {
-				valueArray, err := r.ResolveAll(parameterType.Elem())
-				if err != nil {
-					return nil, err
-				}
-				// is the function variadic and is this the last parameter?
-				if t.IsVariadic() && i == inCount-1 {
-					for _, v := range valueArray {
-						values = append(values, reflect.ValueOf(v))
-					}
-				} else {
-					slice := reflect.MakeSlice(parameterType, 0, 0)
-					for i := 0; i < len(valueArray); i++ {
-						slice = reflect.Append(slice, reflect.ValueOf(valueArray[i]))
-					}
-					values = append(values, slice)
-				}
-			} else if parameterType.Kind() == reflect.Map && parameterType.Key().Kind() == reflect.String {
-				keyType := parameterType.Key()
-				valueType := parameterType.Elem()
-				mapType := reflect.MapOf(keyType, valueType)
-				mapValue := reflect.MakeMap(mapType)
-				names, ok := c.nameLookup[valueType.String()]
-				if ok {
-					valueArray, err := r.ResolveAll(valueType)
-					if err != nil {
-						return nil, err
-					}
-					for name, index := range names {
-						mapValue.SetMapIndex(reflect.ValueOf(name), reflect.ValueOf(valueArray[index]))
-					}
-				}
-				values = append(values, mapValue)
-			} else {
-				value, err := r.Resolve(parameterType)
-				if err != nil {
-					return nil, err
-				}
-				values = append(values, reflect.ValueOf(value))
-			}
-		}
-		constructorValue := reflect.ValueOf(constructor)
-		results := constructorValue.Call(values)
-		if len(results) == 0 {
-			return nil, fmt.Errorf("no result while executing constructor '%s'", t.String())
-		}
-		var instance interface{}
-		if !results[0].IsNil() {
-			instance = results[0].Interface()
-		}
-		var err error = nil
-		if len(results) == 2 {
-			if !results[1].IsNil() {
-				err = results[1].Interface().(error)
-			}
-		}
-		return instance, err
+		return c.Invoke(constructor)
 	}
+
+	returnType := t.Out(0)
 	c.RegisterDynamic(returnType, delegate, options...)
 	return nil
 }
@@ -256,4 +188,124 @@ func (c *container) ResolveAll(t reflect.Type) ([]interface{}, error) {
 		c.cache[t.String()] = results
 	}
 	return results, nil
+}
+
+func (c *container) ResolveMap(t reflect.Type) (map[string]interface{}, error) {
+	mapValue, err := c.resolveMap(t)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]interface{}{}
+	for _, k := range mapValue.MapKeys() {
+		v := mapValue.MapIndex(k)
+		result[k.String()] = v.Interface()
+	}
+	return result, nil
+}
+
+func (c *container) resolveMap(t reflect.Type) (reflect.Value, error) {
+	keyType := reflect.TypeOf((*string)(nil)).Elem()
+	valueType := t
+	mapType := reflect.MapOf(keyType, valueType)
+	mapValue := reflect.MakeMap(mapType)
+	names, ok := c.nameLookup[valueType.String()]
+	var zero reflect.Value
+	if ok {
+		valueArray, err := c.ResolveAll(valueType)
+		if err != nil {
+			return zero, err
+		}
+		for name, index := range names {
+			mapValue.SetMapIndex(reflect.ValueOf(name), reflect.ValueOf(valueArray[index]))
+		}
+	}
+	return mapValue, nil
+}
+
+func validateDelegateType(r Resolver, t reflect.Type) error {
+	if t.Kind() != reflect.Func {
+		return fmt.Errorf("function '%s' must be a method", t.Elem())
+	}
+
+	outCount := t.NumOut()
+	if outCount == 0 {
+		return fmt.Errorf("function must have a return value and optional error")
+	}
+	if outCount == 2 {
+		errorType := t.Out(1)
+		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			return fmt.Errorf("if a function has two return parameters, the second must implement error")
+		}
+	} else if outCount != 1 {
+		return fmt.Errorf("function must have a return value and optional error")
+	}
+	return nil
+}
+
+func (c *container) resolveParameters(t reflect.Type) ([]reflect.Value, error) {
+	// build up the parameter list
+	inCount := t.NumIn()
+	values := []reflect.Value{}
+	for i := 0; i < inCount; i++ {
+		parameterType := t.In(i)
+		if parameterType.Kind() == reflect.Array || parameterType.Kind() == reflect.Slice {
+			valueArray, err := c.ResolveAll(parameterType.Elem())
+			if err != nil {
+				return nil, err
+			}
+			// is the function variadic and is this the last parameter?
+			if t.IsVariadic() && i == inCount-1 {
+				for _, v := range valueArray {
+					values = append(values, reflect.ValueOf(v))
+				}
+			} else {
+				slice := reflect.MakeSlice(parameterType, 0, 0)
+				for i := 0; i < len(valueArray); i++ {
+					slice = reflect.Append(slice, reflect.ValueOf(valueArray[i]))
+				}
+				values = append(values, slice)
+			}
+		} else if parameterType.Kind() == reflect.Map && parameterType.Key().Kind() == reflect.String {
+			mapValue, err := c.resolveMap(parameterType.Elem())
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, mapValue)
+		} else {
+			value, err := c.Resolve(parameterType)
+			if err != nil {
+				return nil, err
+			}
+			values = append(values, reflect.ValueOf(value))
+		}
+	}
+	return values, nil
+}
+
+func (c *container) Invoke(delegate interface{}) (interface{}, error) {
+	t := reflect.TypeOf(delegate)
+	err := validateDelegateType(c, t)
+	if err != nil {
+		return nil, err
+	}
+	parameters, err := c.resolveParameters(t)
+	if err != nil {
+		return nil, err
+	}
+	constructorValue := reflect.ValueOf(delegate)
+	results := constructorValue.Call(parameters)
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no result while executing function '%s'", t.String())
+	}
+	var instance interface{}
+	if !results[0].IsZero() {
+		instance = results[0].Interface()
+	}
+
+	if len(results) == 2 {
+		if !results[1].IsZero() {
+			err = results[1].Interface().(error)
+		}
+	}
+	return instance, err
 }

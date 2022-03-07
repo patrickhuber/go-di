@@ -303,6 +303,27 @@ var _ = Describe("Container", func() {
 		Expect(err).To(BeNil())
 		Expect(len(all)).To(Equal(2))
 	})
+	It("can resolve map", func() {
+		container := di.NewContainer()
+		keys := []string{"one", "two"}
+		for _, key := range keys {
+			container.RegisterInstance(SampleInterfaceType, NewSample(key), di.WithKey(key))
+		}
+		m, err := container.ResolveMap(SampleInterfaceType)
+		Expect(err).To(BeNil())
+		Expect(len(m)).To(Equal(len(keys)))
+	})
+	It("can invoke function", func() {
+		container := di.NewContainer()
+		container.RegisterInstance(StringType, "hello")
+		container.RegisterInstance(SampleInterfaceType, NewSample("test"))
+		myFunction := func(sample SampleInterface, greeting string) string {
+			return greeting + " " + sample.Name()
+		}
+		result, err := container.Invoke(myFunction)
+		Expect(err).To(BeNil())
+		Expect(result).To(Equal("hello test"))
+	})
 	Context("key", func() {
 		It("can resolve by key", func() {
 			container := di.NewContainer()
