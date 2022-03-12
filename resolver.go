@@ -19,8 +19,3 @@ type Resolver interface {
 	// ResolveByName resolves the instance registered for a given type and name
 	ResolveByName(t reflect.Type, name string) (interface{}, error)
 }
-
-type Invoker interface {
-	// Invoke the given function using the container to supply parameters
-	Invoke(delegate interface{}) (interface{}, error)
-}
