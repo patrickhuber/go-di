@@ -154,22 +154,6 @@ var _ = Describe("Container", func() {
 		_, ok := instance.(SampleInterface)
 		Expect(ok).To(BeTrue())
 	})
-	It("can register constructor", func() {
-		container := di.NewContainer()
-		name := "myname"
-
-		container.RegisterInstance(StringType, name)
-		err := container.RegisterConstructor(NewSample)
-		Expect(err).To(BeNil())
-
-		instance, err := container.Resolve(SampleInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
-
-		sample, ok := instance.(SampleInterface)
-		Expect(ok).To(BeTrue())
-		Expect(sample.Name()).To(Equal(name))
-	})
 	It("can register dynamic", func() {
 		container := di.NewContainer()
 		name := "myname"
@@ -186,114 +170,132 @@ var _ = Describe("Container", func() {
 		Expect(value).To(Equal(name))
 
 	})
-	It("can register array parameter", func() {
-		container := di.NewContainer()
-		dependencies := []*SampleStruct{
-			{name: "sample 1"},
-			{name: "sample 2"},
-		}
-		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
-		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		err := container.RegisterConstructor(NewAggregate)
-		Expect(err).To(BeNil())
+	Context("Constructor", func() {
+		It("can register constructor", func() {
+			container := di.NewContainer()
+			name := "myname"
 
-		instance, err := container.Resolve(AggregateInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
-		a, ok := instance.(AggregateInterface)
-		Expect(ok).To(BeTrue())
-		Expect(a).ToNot(BeNil())
-		Expect(len(a.Names())).To(Equal(2))
-	})
-	It("can register variadic parameter", func() {
-		container := di.NewContainer()
-		dependencies := []*SampleStruct{
-			{name: "sample 1"},
-			{name: "sample 2"},
-		}
-		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
-		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-		err := container.RegisterConstructor(NewVariadic)
-		Expect(err).To(BeNil())
+			container.RegisterInstance(StringType, name)
+			err := container.RegisterConstructor(NewSample)
+			Expect(err).To(BeNil())
 
-		instance, err := container.Resolve(AggregateInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
-		_, ok := instance.(AggregateInterface)
-		Expect(ok).To(BeTrue())
-	})
-	It("can register map parameter", func() {
-		container := di.NewContainer()
-		dependencies := []*SampleStruct{
-			{name: "sample 1"},
-			{name: "sample 2"},
-		}
-		for _, d := range dependencies {
-			container.RegisterInstance(DependencyInterfaceType, d, di.WithKey(d.Name()))
-		}
-		err := container.RegisterConstructor(NewMap)
-		Expect(err).To(BeNil())
+			instance, err := container.Resolve(SampleInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
 
-		instance, err := container.Resolve(MapInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+			sample, ok := instance.(SampleInterface)
+			Expect(ok).To(BeTrue())
+			Expect(sample.Name()).To(Equal(name))
+		})
+		It("can register array parameter", func() {
+			container := di.NewContainer()
+			dependencies := []*SampleStruct{
+				{name: "sample 1"},
+				{name: "sample 2"},
+			}
+			container.RegisterInstance(DependencyInterfaceType, dependencies[0])
+			container.RegisterInstance(DependencyInterfaceType, dependencies[1])
+			err := container.RegisterConstructor(NewAggregate)
+			Expect(err).To(BeNil())
 
-		mapInstance, ok := instance.(MapInterface)
-		Expect(ok).To(BeTrue())
-		Expect(len(mapInstance.Keys())).To(Equal(2))
-	})
-	It("returns empty map when no keys specified", func() {
-		container := di.NewContainer()
-		dependencies := []*SampleStruct{
-			{name: "sample 1"},
-			{name: "sample 2"},
-		}
-		for _, d := range dependencies {
-			container.RegisterInstance(DependencyInterfaceType, d)
-		}
-		err := container.RegisterConstructor(NewMap)
-		Expect(err).To(BeNil())
+			instance, err := container.Resolve(AggregateInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
+			a, ok := instance.(AggregateInterface)
+			Expect(ok).To(BeTrue())
+			Expect(a).ToNot(BeNil())
+			Expect(len(a.Names())).To(Equal(2))
+		})
+		It("can register variadic parameter", func() {
+			container := di.NewContainer()
+			dependencies := []*SampleStruct{
+				{name: "sample 1"},
+				{name: "sample 2"},
+			}
+			container.RegisterInstance(DependencyInterfaceType, dependencies[0])
+			container.RegisterInstance(DependencyInterfaceType, dependencies[1])
+			err := container.RegisterConstructor(NewVariadic)
+			Expect(err).To(BeNil())
 
-		instance, err := container.Resolve(MapInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+			instance, err := container.Resolve(AggregateInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
+			_, ok := instance.(AggregateInterface)
+			Expect(ok).To(BeTrue())
+		})
+		It("can register map parameter", func() {
+			container := di.NewContainer()
+			dependencies := []*SampleStruct{
+				{name: "sample 1"},
+				{name: "sample 2"},
+			}
+			for _, d := range dependencies {
+				container.RegisterInstance(DependencyInterfaceType, d, di.WithKey(d.Name()))
+			}
+			err := container.RegisterConstructor(NewMap)
+			Expect(err).To(BeNil())
 
-		mapInstance, ok := instance.(MapInterface)
-		Expect(ok).To(BeTrue())
-		Expect(len(mapInstance.Keys())).To(Equal(0))
-	})
-	It("can invoke constructor that returns error", func() {
-		container := di.NewContainer()
+			instance, err := container.Resolve(MapInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
 
-		err := container.RegisterConstructor(NewWithError)
-		Expect(err).To(BeNil())
+			mapInstance, ok := instance.(MapInterface)
+			Expect(ok).To(BeTrue())
+			Expect(len(mapInstance.Keys())).To(Equal(2))
+		})
+		It("returns empty map when no keys specified", func() {
+			container := di.NewContainer()
+			dependencies := []*SampleStruct{
+				{name: "sample 1"},
+				{name: "sample 2"},
+			}
+			for _, d := range dependencies {
+				container.RegisterInstance(DependencyInterfaceType, d)
+			}
+			err := container.RegisterConstructor(NewMap)
+			Expect(err).To(BeNil())
 
-		i, err := container.Resolve(SampleInterfaceType)
-		Expect(err).ToNot(BeNil())
-		Expect(i).To(BeNil())
-	})
-	It("can invoke constructor that returns value and nil error", func() {
-		container := di.NewContainer()
+			instance, err := container.Resolve(MapInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(instance).ToNot(BeNil())
 
-		err := container.RegisterConstructor(NewWithNilError)
-		Expect(err).To(BeNil())
+			mapInstance, ok := instance.(MapInterface)
+			Expect(ok).To(BeTrue())
+			Expect(len(mapInstance.Keys())).To(Equal(0))
+		})
+		It("can invoke constructor that returns error", func() {
+			container := di.NewContainer()
 
-		i, err := container.Resolve(SampleInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(i).ToNot(BeNil())
+			err := container.RegisterConstructor(NewWithError)
+			Expect(err).To(BeNil())
 
-		_, ok := i.(SampleInterface)
-		Expect(ok).To(BeTrue())
-	})
-	It("throws error when second return type is not error", func() {
-		container := di.NewContainer()
-		err := container.RegisterConstructor(TwoReturnTypes)
-		Expect(err).ToNot(BeNil())
-	})
-	It("throws error when no return type", func() {
-		container := di.NewContainer()
-		err := container.RegisterConstructor(func() {})
-		Expect(err).ToNot(BeNil())
+			i, err := container.Resolve(SampleInterfaceType)
+			Expect(err).ToNot(BeNil())
+			Expect(i).To(BeNil())
+		})
+		It("can invoke constructor that returns value and nil error", func() {
+			container := di.NewContainer()
+
+			err := container.RegisterConstructor(NewWithNilError)
+			Expect(err).To(BeNil())
+
+			i, err := container.Resolve(SampleInterfaceType)
+			Expect(err).To(BeNil())
+			Expect(i).ToNot(BeNil())
+
+			_, ok := i.(SampleInterface)
+			Expect(ok).To(BeTrue())
+		})
+		It("throws error when second return type is not error", func() {
+			container := di.NewContainer()
+			err := container.RegisterConstructor(TwoReturnTypes)
+			Expect(err).ToNot(BeNil())
+		})
+		It("throws error when no return type", func() {
+			container := di.NewContainer()
+			err := container.RegisterConstructor(func() {})
+			Expect(err).ToNot(BeNil())
+		})
 	})
 	It("can resolve all", func() {
 		container := di.NewContainer()
@@ -313,16 +315,33 @@ var _ = Describe("Container", func() {
 		Expect(err).To(BeNil())
 		Expect(len(m)).To(Equal(len(keys)))
 	})
-	It("can invoke function", func() {
-		container := di.NewContainer()
-		container.RegisterInstance(StringType, "hello")
-		container.RegisterInstance(SampleInterfaceType, NewSample("test"))
-		myFunction := func(sample SampleInterface, greeting string) string {
-			return greeting + " " + sample.Name()
-		}
-		result, err := container.Invoke(myFunction)
-		Expect(err).To(BeNil())
-		Expect(result).To(Equal("hello test"))
+	Context("Invoke", func() {
+		It("can invoke function", func() {
+			container := di.NewContainer()
+			container.RegisterInstance(StringType, "hello")
+			container.RegisterInstance(SampleInterfaceType, NewSample("test"))
+			myFunction := func(sample SampleInterface, greeting string) string {
+				return greeting + " " + sample.Name()
+			}
+			result, err := container.Invoke(myFunction)
+			Expect(err).To(BeNil())
+			Expect(result).To(Equal("hello test"))
+		})
+		It("can return struct pointer", func() {
+			container := di.NewContainer()
+			container.RegisterInstance(SampleInterfaceType, NewSample("test"))
+			myFunction := func(sample SampleInterface) *SampleStruct {
+				return &SampleStruct{
+					name: sample.Name(),
+				}
+			}
+			result, err := container.Invoke(myFunction)
+			Expect(err).To(BeNil())
+			Expect(result).ToNot(BeNil())
+			sample, ok := result.(*SampleStruct)
+			Expect(ok).To(BeTrue())
+			Expect(sample.Name()).To(Equal("test"))
+		})
 	})
 	Context("key", func() {
 		It("can resolve by key", func() {
