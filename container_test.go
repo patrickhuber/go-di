@@ -230,7 +230,7 @@ var _ = Describe("Container", func() {
 				{name: "sample 2"},
 			}
 			for _, d := range dependencies {
-				container.RegisterInstance(DependencyInterfaceType, d, di.WithKey(d.Name()))
+				container.RegisterInstance(DependencyInterfaceType, d, di.WithName(d.Name()))
 			}
 			err := container.RegisterConstructor(NewMap)
 			Expect(err).To(BeNil())
@@ -309,45 +309,17 @@ var _ = Describe("Container", func() {
 		container := di.NewContainer()
 		keys := []string{"one", "two"}
 		for _, key := range keys {
-			container.RegisterInstance(SampleInterfaceType, NewSample(key), di.WithKey(key))
+			container.RegisterInstance(SampleInterfaceType, NewSample(key), di.WithName(key))
 		}
 		m, err := container.ResolveMap(SampleInterfaceType)
 		Expect(err).To(BeNil())
 		Expect(len(m)).To(Equal(len(keys)))
 	})
-	Context("Invoke", func() {
-		It("can invoke function", func() {
-			container := di.NewContainer()
-			container.RegisterInstance(StringType, "hello")
-			container.RegisterInstance(SampleInterfaceType, NewSample("test"))
-			myFunction := func(sample SampleInterface, greeting string) string {
-				return greeting + " " + sample.Name()
-			}
-			result, err := container.Invoke(myFunction)
-			Expect(err).To(BeNil())
-			Expect(result).To(Equal("hello test"))
-		})
-		It("can return struct pointer", func() {
-			container := di.NewContainer()
-			container.RegisterInstance(SampleInterfaceType, NewSample("test"))
-			myFunction := func(sample SampleInterface) *SampleStruct {
-				return &SampleStruct{
-					name: sample.Name(),
-				}
-			}
-			result, err := container.Invoke(myFunction)
-			Expect(err).To(BeNil())
-			Expect(result).ToNot(BeNil())
-			sample, ok := result.(*SampleStruct)
-			Expect(ok).To(BeTrue())
-			Expect(sample.Name()).To(Equal("test"))
-		})
-	})
 	Context("key", func() {
 		It("can resolve by key", func() {
 			container := di.NewContainer()
-			container.RegisterInstance(SampleInterfaceType, NewSample("one"), di.WithKey("one"))
-			container.RegisterInstance(SampleInterfaceType, NewSample("two"), di.WithKey("two"))
+			container.RegisterInstance(SampleInterfaceType, NewSample("one"), di.WithName("one"))
+			container.RegisterInstance(SampleInterfaceType, NewSample("two"), di.WithName("two"))
 			instance, err := container.ResolveByName(SampleInterfaceType, "two")
 			Expect(err).To(BeNil())
 			Expect(instance).ToNot(BeNil())

@@ -2,7 +2,6 @@ package di
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 )
 
@@ -14,7 +13,8 @@ const (
 )
 
 var (
-	ErrNotExist = errors.New("item does not exist")
+	ErrNotExist     = errors.New("item does not exist")
+	ErrNameNotExist = errors.New("item with the given name does not exist")
 )
 
 // Container represents a dependency injection container
@@ -30,23 +30,60 @@ type Container interface {
 
 	// Resolver is required as a Container must allow resolution
 	Resolver
-
-	// Invoker allows the container to invoke functions by using container parameters
-	Invoker
 }
 
 type FuncResolver func(Resolver) (interface{}, error)
 
+type registrationOption struct {
+	name     string
+	key      string
+	resolver FuncResolver
+	lifetime Lifetime
+}
+
+type containerItem struct {
+	data   interface{}
+	err    error
+	option *registrationOption
+}
+
+func (i *containerItem) resolve(r Resolver) (interface{}, error) {
+
+	// was the error cached?
+	if i.err != nil {
+		return nil, i.err
+	}
+
+	// was the data cached?
+	if i.data != nil {
+		return i.data, nil
+	}
+
+	// execute the resolver
+	data, err := i.option.resolver(r)
+
+	// if static lifetime, cache the results
+	if i.option.lifetime == LifetimeStatic {
+		i.data = data
+		i.err = err
+	}
+
+	return data, err
+}
+
+// containerItemGroup holds a group of container items
+type containerItemGroup struct {
+	items      []*containerItem
+	namedItems map[string]*containerItem
+}
+
 type container struct {
-	data  map[string][]FuncResolver
-	cache map[string][]interface{}
-	// nameLookup looks up by [type][name][index] where index is the position in the data[type][] array
-	nameLookup     map[string]map[string]int
+	groups         map[string]*containerItemGroup
 	defaultOptions []DefaultRegistrationOption
 }
 
-type InstanceRegistrationOption func(*container, reflect.Type)
-type DefaultRegistrationOption func(*container, reflect.Type)
+type InstanceRegistrationOption func(*registrationOption)
+type DefaultRegistrationOption func(*registrationOption)
 
 // WithLifetime sets the lifetime of the registration
 func WithLifetime(lifetime Lifetime) InstanceRegistrationOption {
@@ -58,29 +95,15 @@ func WithDefaultLifetime(lifetime Lifetime) DefaultRegistrationOption {
 	return withLifetime(lifetime)
 }
 
-func withLifetime(lifetime Lifetime) func(c *container, t reflect.Type) {
-	return func(c *container, t reflect.Type) {
-		// if the lifetime is per request, make sure to clear any static lifetimes that were set
-		if lifetime == LifetimePerRequest {
-			delete(c.cache, t.String())
-		}
-		// if the lifetime is static, set the cache key to cache the first invocation
-		if lifetime == LifetimeStatic {
-			c.cache[t.String()] = nil
-		}
+func withLifetime(lifetime Lifetime) func(i *registrationOption) {
+	return func(i *registrationOption) {
+		i.lifetime = lifetime
 	}
 }
 
-func WithKey(key string) InstanceRegistrationOption {
-	return func(c *container, t reflect.Type) {
-		nameToIndex, ok := c.nameLookup[t.String()]
-		if !ok {
-			nameToIndex = map[string]int{}
-			c.nameLookup[t.String()] = nameToIndex
-		}
-
-		index := len(c.data[t.String()]) - 1
-		nameToIndex[key] = index
+func WithName(name string) InstanceRegistrationOption {
+	return func(i *registrationOption) {
+		i.name = name
 	}
 }
 
@@ -88,9 +111,7 @@ func WithKey(key string) InstanceRegistrationOption {
 func NewContainer(options ...DefaultRegistrationOption) Container {
 
 	return &container{
-		data:           map[string][]FuncResolver{},
-		cache:          map[string][]interface{}{},
-		nameLookup:     map[string]map[string]int{},
+		groups:         map[string]*containerItemGroup{},
 		defaultOptions: options,
 	}
 }
@@ -103,7 +124,7 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Inst
 	}
 
 	delegate := func(r Resolver) (interface{}, error) {
-		return c.Invoke(constructor)
+		return Invoke(r, constructor)
 	}
 
 	returnType := t.Out(0)
@@ -112,20 +133,42 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Inst
 }
 
 func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption) {
-	delegates, ok := c.data[t.String()]
-	if !ok {
-		delegates = []FuncResolver{}
+	// try to find the existing container item group
+	key := t.String()
+
+	o := &registrationOption{
+		key:      key,
+		resolver: delegate,
 	}
-	delegates = append(delegates, delegate)
-	c.data[t.String()] = delegates
 
 	// apply the default options
 	for _, option := range c.defaultOptions {
-		option(c, t)
+		option(o)
 	}
+
 	// apply the override options
 	for _, option := range options {
-		option(c, t)
+		option(o)
+	}
+
+	group, ok := c.groups[key]
+	if !ok {
+		group = &containerItemGroup{
+			items:      []*containerItem{},
+			namedItems: map[string]*containerItem{},
+		}
+		c.groups[key] = group
+	}
+
+	item := &containerItem{
+		option: o,
+	}
+
+	// if the name is empty, append to the list of unnamed items
+	if o.name == "" {
+		group.items = append(group.items, item)
+	} else {
+		group.namedItems[o.name] = item
 	}
 }
 
@@ -133,6 +176,15 @@ func (c *container) RegisterInstance(t reflect.Type, instance interface{}, optio
 	c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
 		return instance, nil
 	}, options...)
+}
+
+func (c *container) group(t reflect.Type) (*containerItemGroup, error) {
+	key := t.String()
+	group, ok := c.groups[key]
+	if !ok {
+		return nil, ErrNotExist
+	}
+	return group, nil
 }
 
 func (c *container) Resolve(t reflect.Type) (interface{}, error) {
@@ -144,168 +196,75 @@ func (c *container) Resolve(t reflect.Type) (interface{}, error) {
 }
 
 func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, error) {
-	results, err := c.ResolveAll(t)
+	group, err := c.group(t)
 	if err != nil {
 		return nil, err
 	}
-	indexMap, typeExists := c.nameLookup[t.String()]
-	if !typeExists {
-		return nil, ErrNotExist
+	item, ok := group.namedItems[name]
+	if !ok {
+		return nil, ErrNameNotExist
 	}
-	index, nameExists := indexMap[name]
-	if !nameExists {
-		return nil, fmt.Errorf("name %s does not exist for type %s :%w", name, t.String(), ErrNotExist)
-	}
-	if index >= len(results) {
-		return nil, ErrNotExist
-	}
-	return results[index], nil
+	return item.resolve(c)
 }
 
 func (c *container) ResolveAll(t reflect.Type) ([]interface{}, error) {
-	cached, shouldCache := c.cache[t.String()]
-	isCached := cached != nil
-	if shouldCache && isCached {
-		return cached, nil
-	}
-
-	delegates, ok := c.data[t.String()]
-	if !ok {
-		return nil, fmt.Errorf("type %s not found", t.String())
-	}
-	if len(delegates) == 0 {
-		return nil, fmt.Errorf("type %s not found", t.String())
-	}
-	results := []interface{}{}
-	for _, d := range delegates {
-		result, err := d(c)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, result)
-	}
-	if shouldCache && !isCached {
-		c.cache[t.String()] = results
-	}
-	return results, nil
-}
-
-func (c *container) ResolveMap(t reflect.Type) (map[string]interface{}, error) {
-	mapValue, err := c.resolveMap(t)
+	group, err := c.group(t)
 	if err != nil {
 		return nil, err
 	}
+
+	// loop over the group named instances and collect
+	var all []interface{}
+	for _, v := range group.namedItems {
+		data, err := v.resolve(c)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, data)
+	}
+	// loop over regular instances and collect
+	for _, v := range group.items {
+		data, err := v.resolve(c)
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, data)
+	}
+	return all, nil
+}
+
+func (c *container) ResolveMap(t reflect.Type) (map[string]interface{}, error) {
+	group, err := c.group(t)
+	if err != nil {
+		return nil, err
+	}
+
 	result := map[string]interface{}{}
-	for _, k := range mapValue.MapKeys() {
-		v := mapValue.MapIndex(k)
-		result[k.String()] = v.Interface()
+	for k, v := range group.namedItems {
+		data, err := v.resolve(c)
+		if err != nil {
+			return nil, err
+		}
+		result[k] = data
 	}
 	return result, nil
 }
 
-func (c *container) resolveMap(t reflect.Type) (reflect.Value, error) {
-	keyType := reflect.TypeOf((*string)(nil)).Elem()
-	valueType := t
-	mapType := reflect.MapOf(keyType, valueType)
-	mapValue := reflect.MakeMap(mapType)
-	names, ok := c.nameLookup[valueType.String()]
+func (c *container) resolveSlice(t reflect.Type) (reflect.Value, error) {
 	var zero reflect.Value
-	if ok {
-		valueArray, err := c.ResolveAll(valueType)
-		if err != nil {
-			return zero, err
-		}
-		for name, index := range names {
-			mapValue.SetMapIndex(reflect.ValueOf(name), reflect.ValueOf(valueArray[index]))
-		}
-	}
-	return mapValue, nil
-}
-
-func validateDelegateType(r Resolver, t reflect.Type) error {
-	if t.Kind() != reflect.Func {
-		return fmt.Errorf("function '%s' must be a method", t.Elem())
-	}
-
-	outCount := t.NumOut()
-	if outCount == 0 {
-		return fmt.Errorf("function must have a return value and optional error")
-	}
-	if outCount == 2 {
-		errorType := t.Out(1)
-		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-			return fmt.Errorf("if a function has two return parameters, the second must implement error")
-		}
-	} else if outCount != 1 {
-		return fmt.Errorf("function must have a return value and optional error")
-	}
-	return nil
-}
-
-func (c *container) resolveParameters(t reflect.Type) ([]reflect.Value, error) {
-	// build up the parameter list
-	inCount := t.NumIn()
-	values := []reflect.Value{}
-	for i := 0; i < inCount; i++ {
-		parameterType := t.In(i)
-		if parameterType.Kind() == reflect.Array || parameterType.Kind() == reflect.Slice {
-			valueArray, err := c.ResolveAll(parameterType.Elem())
-			if err != nil {
-				return nil, err
-			}
-			// is the function variadic and is this the last parameter?
-			if t.IsVariadic() && i == inCount-1 {
-				for _, v := range valueArray {
-					values = append(values, reflect.ValueOf(v))
-				}
-			} else {
-				slice := reflect.MakeSlice(parameterType, 0, 0)
-				for i := 0; i < len(valueArray); i++ {
-					slice = reflect.Append(slice, reflect.ValueOf(valueArray[i]))
-				}
-				values = append(values, slice)
-			}
-		} else if parameterType.Kind() == reflect.Map && parameterType.Key().Kind() == reflect.String {
-			mapValue, err := c.resolveMap(parameterType.Elem())
-			if err != nil {
-				return nil, err
-			}
-			values = append(values, mapValue)
-		} else {
-			value, err := c.Resolve(parameterType)
-			if err != nil {
-				return nil, err
-			}
-			values = append(values, reflect.ValueOf(value))
-		}
-	}
-	return values, nil
-}
-
-func (c *container) Invoke(delegate interface{}) (interface{}, error) {
-	t := reflect.TypeOf(delegate)
-	err := validateDelegateType(c, t)
+	valueArray, err := c.ResolveAll(t.Elem())
 	if err != nil {
-		return nil, err
-	}
-	parameters, err := c.resolveParameters(t)
-	if err != nil {
-		return nil, err
-	}
-	constructorValue := reflect.ValueOf(delegate)
-	results := constructorValue.Call(parameters)
-	if len(results) == 0 {
-		return nil, fmt.Errorf("no result while executing function '%s'", t.String())
-	}
-	var instance interface{}
-	if !results[0].IsZero() {
-		instance = results[0].Interface()
+		return zero, err
 	}
 
-	if len(results) == 2 {
-		if !results[1].IsZero() {
-			err = results[1].Interface().(error)
-		}
+	// make the slice the right size
+	slice := reflect.MakeSlice(t, len(valueArray), len(valueArray))
+
+	// set indexes of the slice
+	for i, value := range valueArray {
+		ptr := slice.Index(i)
+		ptr.Set(reflect.ValueOf(value))
 	}
-	return instance, err
+
+	return slice, nil
 }
