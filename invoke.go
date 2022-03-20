@@ -18,7 +18,7 @@ func Invoke(resolver Resolver, delegate interface{}) (interface{}, error) {
 	constructorValue := reflect.ValueOf(delegate)
 	results := constructorValue.Call(parameters)
 	if len(results) == 0 {
-		return nil, fmt.Errorf("no result while executing function '%s'", t.String())
+		return nil, nil
 	}
 	var instance interface{}
 	if !results[0].IsZero() {
@@ -36,19 +36,6 @@ func Invoke(resolver Resolver, delegate interface{}) (interface{}, error) {
 func validateDelegateType(r Resolver, t reflect.Type) error {
 	if t.Kind() != reflect.Func {
 		return fmt.Errorf("function '%s' must be a method", t.Elem())
-	}
-
-	outCount := t.NumOut()
-	if outCount == 0 {
-		return fmt.Errorf("function must have a return value and optional error")
-	}
-	if outCount == 2 {
-		errorType := t.Out(1)
-		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
-			return fmt.Errorf("if a function has two return parameters, the second must implement error")
-		}
-	} else if outCount != 1 {
-		return fmt.Errorf("function must have a return value and optional error")
 	}
 	return nil
 }

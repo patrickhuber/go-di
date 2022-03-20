@@ -2,6 +2,7 @@ package di
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 )
 
@@ -118,7 +119,7 @@ func NewContainer(options ...DefaultRegistrationOption) Container {
 
 func (c *container) RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error {
 	t := reflect.TypeOf(constructor)
-	err := validateDelegateType(c, t)
+	err := validateDelegateTypeIsConstructor(c, t)
 	if err != nil {
 		return err
 	}
@@ -129,6 +130,25 @@ func (c *container) RegisterConstructor(constructor interface{}, options ...Inst
 
 	returnType := t.Out(0)
 	c.RegisterDynamic(returnType, delegate, options...)
+	return nil
+}
+
+func validateDelegateTypeIsConstructor(r Resolver, t reflect.Type) error {
+	err := validateDelegateType(r, t)
+	if err != nil {
+		return err
+	}
+	outCount := t.NumOut()
+	if outCount == 0 {
+		return fmt.Errorf("function must have a return value and optional error")
+	} else if outCount == 2 {
+		errorType := t.Out(1)
+		if !errorType.Implements(reflect.TypeOf((*error)(nil)).Elem()) {
+			return fmt.Errorf("if a function has two return parameters, the second must implement error")
+		}
+	} else if outCount != 1 {
+		return fmt.Errorf("function must have a return value and optional error")
+	}
 	return nil
 }
 

@@ -33,6 +33,20 @@ var _ = Describe("Invoke", func() {
 		Expect(ok).To(BeTrue())
 		Expect(sample.Name()).To(Equal("test"))
 	})
+	It("can register struct pointer", func() {
+		container := di.NewContainer()
+		myFunction := func() *SampleStruct {
+			return &SampleStruct{
+				name: "test",
+			}
+		}
+		container.RegisterConstructor(myFunction)
+		_, err := di.Invoke(container, func(sample *SampleStruct) {
+			Expect(sample).ToNot(BeNil())
+			Expect(sample.Name()).To(Equal("test"))
+		})
+		Expect(err).To(BeNil())
+	})
 	It("can invoke array parameter", func() {})
 	It("can invoke variadic parameter", func() {})
 	It("can invoke map parameter", func() {})
