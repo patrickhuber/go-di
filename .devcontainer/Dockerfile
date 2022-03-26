@@ -1,13 +1,13 @@
-ARG VARIANT="1.18beta2"
+ARG VARIANT="1.18-bullseye"
 
-# See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.209.6/containers/go/.devcontainer/base.Dockerfile
-FROM golang:1.17 as builder
+# See here for image contents: https://github.com/microsoft/vscode-dev-containers/tree/v0.224.3/containers/go/.devcontainer/base.Dockerfile
+FROM golang:1.18 as builder
 WORKDIR /go/src/github.com/patrickhuber/temp
 RUN go mod init "github.com/patrickhuber/temp" && \
-    go get github.com/onsi/ginkgo/v2/ginkgo@latest
+    go install github.com/onsi/ginkgo/v2/ginkgo@latest
 
 # [Choice] Go version (use -bullseye variants on local arm64/Apple Silicon): 1, 1.16, 1.17, 1-bullseye, 1.16-bullseye, 1.17-bullseye, 1-buster, 1.16-buster, 1.17-buster
-FROM golang:${VARIANT}
+FROM mcr.microsoft.com/vscode/devcontainers/go:0-${VARIANT}
 
 # [Choice] Node.js version: none, lts/*, 16, 14, 12, 10
 ARG NODE_VERSION="none"
