@@ -14,8 +14,8 @@ const (
 )
 
 var (
-	ErrNotExist     = errors.New("item does not exist")
-	ErrNameNotExist = errors.New("item with the given name does not exist")
+	ErrNotExist     = errors.New("item does not exist in the container")
+	ErrNameNotExist = errors.New("item with the given name does not exist in the container")
 )
 
 // Container represents a dependency injection container
@@ -202,7 +202,7 @@ func (c *container) group(t reflect.Type) (*containerItemGroup, error) {
 	key := t.String()
 	group, ok := c.groups[key]
 	if !ok {
-		return nil, ErrNotExist
+		return nil, fmt.Errorf("%w: '%s'", ErrNotExist, key)
 	}
 	return group, nil
 }
@@ -222,7 +222,7 @@ func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, err
 	}
 	item, ok := group.namedItems[name]
 	if !ok {
-		return nil, ErrNameNotExist
+		return nil, fmt.Errorf("%w: '%s'", ErrNameNotExist, name)
 	}
 	return item.resolve(c)
 }
@@ -268,23 +268,4 @@ func (c *container) ResolveMap(t reflect.Type) (map[string]interface{}, error) {
 		result[k] = data
 	}
 	return result, nil
-}
-
-func (c *container) resolveSlice(t reflect.Type) (reflect.Value, error) {
-	var zero reflect.Value
-	valueArray, err := c.ResolveAll(t.Elem())
-	if err != nil {
-		return zero, err
-	}
-
-	// make the slice the right size
-	slice := reflect.MakeSlice(t, len(valueArray), len(valueArray))
-
-	// set indexes of the slice
-	for i, value := range valueArray {
-		ptr := slice.Index(i)
-		ptr.Set(reflect.ValueOf(value))
-	}
-
-	return slice, nil
 }
