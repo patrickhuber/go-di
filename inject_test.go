@@ -2,10 +2,10 @@ package di_test
 
 import (
 	"reflect"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/patrickhuber/go-di"
+	"github.com/stretchr/testify/require"
 )
 
 type Injected interface {
@@ -21,17 +21,14 @@ type Wrapper struct {
 
 var InjectedType = reflect.TypeOf((*Injected)(nil)).Elem()
 
-var _ = Describe("Inject", func() {
-	It("can inject", func() {
-		injected := &injected{}
-		container := di.NewContainer()
-		container.RegisterInstance(InjectedType, injected)
+func TestInject(t *testing.T) {
+	injected := &injected{}
+	container := di.NewContainer()
+	container.RegisterInstance(InjectedType, injected)
 
-		instance := &Wrapper{}
-		err := di.Inject(container, instance)
-		Expect(err).To(BeNil())
-
-		Expect(instance.Injected).ToNot(BeNil())
-		Expect(instance.NotInjected).To(BeNil())
-	})
-})
+	instance := &Wrapper{}
+	err := di.Inject(container, instance)
+	require.NoError(t, err)
+	require.NotNil(t, instance.Injected)
+	require.Nil(t, instance.NotInjected)
+}

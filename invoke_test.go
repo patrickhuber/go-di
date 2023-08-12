@@ -1,13 +1,14 @@
 package di_test
 
 import (
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	"testing"
+
 	"github.com/patrickhuber/go-di"
+	"github.com/stretchr/testify/require"
 )
 
-var _ = Describe("Invoke", func() {
-	It("can invoke function", func() {
+func TestInvoke(t *testing.T) {
+	t.Run("function", func(t *testing.T) {
 		container := di.NewContainer()
 		container.RegisterInstance(StringType, "hello")
 		container.RegisterInstance(SampleInterfaceType, NewSample("test"))
@@ -15,10 +16,10 @@ var _ = Describe("Invoke", func() {
 			return greeting + " " + sample.Name()
 		}
 		result, err := di.Invoke(container, myFunction)
-		Expect(err).To(BeNil())
-		Expect(result).To(Equal("hello test"))
+		require.NoError(t, err)
+		require.Equal(t, "hello test", result)
 	})
-	It("can return struct pointer", func() {
+	t.Run("struct pointer", func(t *testing.T) {
 		container := di.NewContainer()
 		container.RegisterInstance(SampleInterfaceType, NewSample("test"))
 		myFunction := func(sample SampleInterface) *SampleStruct {
@@ -27,13 +28,13 @@ var _ = Describe("Invoke", func() {
 			}
 		}
 		result, err := di.Invoke(container, myFunction)
-		Expect(err).To(BeNil())
-		Expect(result).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, result)
 		sample, ok := result.(*SampleStruct)
-		Expect(ok).To(BeTrue())
-		Expect(sample.Name()).To(Equal("test"))
+		require.True(t, ok)
+		require.Equal(t, "test", sample.name)
 	})
-	It("can register struct pointer", func() {
+	t.Run("register struct pointer", func(t *testing.T) {
 		container := di.NewContainer()
 		myFunction := func() *SampleStruct {
 			return &SampleStruct{
@@ -42,16 +43,16 @@ var _ = Describe("Invoke", func() {
 		}
 		container.RegisterConstructor(myFunction)
 		_, err := di.Invoke(container, func(sample *SampleStruct) {
-			Expect(sample).ToNot(BeNil())
-			Expect(sample.Name()).To(Equal("test"))
+			require.NotNil(t, sample)
+			require.Equal(t, "test", sample.Name())
 		})
-		Expect(err).To(BeNil())
+		require.NoError(t, err)
 	})
-	It("can invoke array parameter", func() {})
-	It("can invoke variadic parameter", func() {})
-	It("can invoke map parameter", func() {})
-	It("can invoke with error and value in return", func() {})
-	It("can invoke with error in return", func() {})
-	It("fails when error is not second return type", func() {})
-	It("throws error with no return type", func() {})
-})
+	t.Run("can invoke array parameter", func(t *testing.T) {})
+	t.Run("can invoke variadic parameter", func(t *testing.T) {})
+	t.Run("can invoke map parameter", func(t *testing.T) {})
+	t.Run("can invoke with error and value in return", func(t *testing.T) {})
+	t.Run("can invoke with error in return", func(t *testing.T) {})
+	t.Run("fails when error is not second return type", func(t *testing.T) {})
+	t.Run("throws error with no return type", func(t *testing.T) {})
+}

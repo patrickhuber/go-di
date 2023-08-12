@@ -2,6 +2,6 @@ package di
 
 import "reflect"
 
-func GetType(instance interface{}) reflect.Type {
+func GetType(instance any) reflect.Type {
 	return reflect.TypeOf(instance).Elem()
 }

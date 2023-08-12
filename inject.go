@@ -2,7 +2,7 @@ package di
 
 import "reflect"
 
-func Inject(resolver Resolver, instance interface{}) error {
+func Inject(resolver Resolver, instance any) error {
 	t := reflect.TypeOf(instance).Elem()
 	v := reflect.ValueOf(instance).Elem()
 

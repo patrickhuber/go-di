@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func Invoke(resolver Resolver, delegate interface{}) (interface{}, error) {
+func Invoke(resolver Resolver, delegate any) (any, error) {
 	t := reflect.TypeOf(delegate)
 	err := validateDelegateType(resolver, t)
 	if err != nil {
@@ -20,7 +20,7 @@ func Invoke(resolver Resolver, delegate interface{}) (interface{}, error) {
 	if len(results) == 0 {
 		return nil, nil
 	}
-	var instance interface{}
+	var instance any
 	if !results[0].IsZero() {
 		instance = results[0].Interface()
 	}

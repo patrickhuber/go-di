@@ -4,10 +4,10 @@ package di_test
 
 import (
 	"reflect"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/patrickhuber/go-di"
+	"github.com/stretchr/testify/require"
 )
 
 type Runner interface {
@@ -25,48 +25,48 @@ func (r *runner) Run() {
 
 var RunnerType = reflect.TypeOf((*Runner)(nil)).Elem()
 
-var _ = Describe("Generic", func() {
-	It("can register instance", func() {
+func TestGeneric(t *testing.T) {
+	t.Run("can register instance", func(t *testing.T) {
 		container := di.NewContainer()
 		runner := NewRunner()
 		di.RegisterInstance(container, runner)
 		instance, err := container.Resolve(RunnerType)
-		Expect(err).To(BeNil())
+		require.NoError(t, err)
 		r, ok := instance.(Runner)
-		Expect(ok).To(BeTrue())
-		Expect(r).ToNot(BeNil())
+		require.True(t, ok)
+		require.NotNil(t, r)
 	})
-	It("can register dynamic", func() {
+	t.Run("can register dynamic", func(t *testing.T) {
 		container := di.NewContainer()
 		resolver := func(r di.Resolver) (Runner, error) {
 			return &runner{}, nil
 		}
 		di.RegisterDynamic(container, resolver)
 		instance, err := container.Resolve(RunnerType)
-		Expect(err).To(BeNil())
+		require.NoError(t, err)
 		r, ok := instance.(Runner)
-		Expect(ok).To(BeTrue())
-		Expect(r).ToNot(BeNil())
+		require.True(t, ok)
+		require.NotNil(t, r)
 	})
-	It("can resolve", func() {
+	t.Run("can resolve", func(t *testing.T) {
 		container := di.NewContainer()
 		runner := NewRunner()
 		container.RegisterInstance(RunnerType, runner)
 		instance, err := di.Resolve[Runner](container)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 	})
-	It("can resolve all", func() {
+	t.Run("can resolve all", func(t *testing.T) {
 		container := di.NewContainer()
 		runner1 := NewRunner()
 		runner2 := NewRunner()
 		container.RegisterInstance(RunnerType, runner1)
 		container.RegisterInstance(RunnerType, runner2)
 		instances, err := di.ResolveAll[Runner](container)
-		Expect(err).To(BeNil())
-		Expect(len(instances)).To(Equal(2))
+		require.NoError(t, err)
+		require.Equal(t, 2, len(instances))
 	})
-	It("can resolve by name", func() {
+	t.Run("can resolve by name", func(t *testing.T) {
 		container := di.NewContainer()
 		runner1 := NewRunner()
 		runner2 := NewRunner()
@@ -75,17 +75,17 @@ var _ = Describe("Generic", func() {
 		container.RegisterInstance(RunnerType, runner2, di.WithName("runner2"))
 		instance, err := di.ResolveByName[Runner](container, "runner1")
 
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 	})
-	It("can register name", func() {
+	t.Run("can register name", func(t *testing.T) {
 
 		container := di.NewContainer()
 		runner := NewRunner()
 		di.RegisterInstance(container, runner, di.WithName("runner1"))
 		instance, err := di.ResolveByName[Runner](container, "runner1")
 
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 	})
-})
+}

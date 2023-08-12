@@ -3,10 +3,10 @@ package di_test
 import (
 	"fmt"
 	"reflect"
+	"testing"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 	"github.com/patrickhuber/go-di"
+	"github.com/stretchr/testify/require"
 )
 
 type SampleStruct struct {
@@ -143,223 +143,270 @@ var AggregateInterfaceType = reflect.TypeOf((*AggregateInterface)(nil)).Elem()
 var MapInterfaceType = reflect.TypeOf((*MapInterface)(nil)).Elem()
 var StorageType = reflect.TypeOf((*Storage)(nil)).Elem()
 
-var _ = Describe("Container", func() {
-	It("can resolve type", func() {
+func TestContainer(t *testing.T) {
+	t.Run("resolve type", func(t *testing.T) {
 		container := di.NewContainer()
 		sample := NewSample("test")
 		container.RegisterInstance(SampleInterfaceType, sample)
 		instance, err := container.Resolve(SampleInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 		_, ok := instance.(SampleInterface)
-		Expect(ok).To(BeTrue())
+		require.True(t, ok)
 	})
-	It("can register dynamic", func() {
+	t.Run("dynamic", func(t *testing.T) {
 		container := di.NewContainer()
 		name := "myname"
-		container.RegisterDynamic(StringType, func(r di.Resolver) (interface{}, error) {
+		container.RegisterDynamic(StringType, func(r di.Resolver) (any, error) {
 			return name, nil
 		})
 
 		instance, err := container.Resolve(StringType)
-		Expect(err).To(BeNil())
-		Expect(instance).ToNot(BeNil())
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 
 		value, ok := instance.(string)
-		Expect(ok).To(BeTrue())
-		Expect(value).To(Equal(name))
-
+		require.True(t, ok)
+		require.Equal(t, name, value)
 	})
-	Context("Constructor", func() {
-		It("can register constructor", func() {
-			container := di.NewContainer()
-			name := "myname"
+}
 
-			container.RegisterInstance(StringType, name)
-			err := container.RegisterConstructor(NewSample)
-			Expect(err).To(BeNil())
+func TestConstructor(t *testing.T) {
+	t.Run("register", func(t *testing.T) {
+		container := di.NewContainer()
+		name := "myname"
 
-			instance, err := container.Resolve(SampleInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
+		container.RegisterInstance(StringType, name)
+		err := container.RegisterConstructor(NewSample)
+		require.NoError(t, err)
 
-			sample, ok := instance.(SampleInterface)
-			Expect(ok).To(BeTrue())
-			Expect(sample.Name()).To(Equal(name))
-		})
-		It("can register array parameter", func() {
-			container := di.NewContainer()
-			dependencies := []*SampleStruct{
-				{name: "sample 1"},
-				{name: "sample 2"},
-			}
-			container.RegisterInstance(DependencyInterfaceType, dependencies[0])
-			container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-			err := container.RegisterConstructor(NewAggregate)
-			Expect(err).To(BeNil())
+		instance, err := container.Resolve(SampleInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 
-			instance, err := container.Resolve(AggregateInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
-			a, ok := instance.(AggregateInterface)
-			Expect(ok).To(BeTrue())
-			Expect(a).ToNot(BeNil())
-			Expect(len(a.Names())).To(Equal(2))
-		})
-		It("can register variadic parameter", func() {
-			container := di.NewContainer()
-			dependencies := []*SampleStruct{
-				{name: "sample 1"},
-				{name: "sample 2"},
-			}
-			container.RegisterInstance(DependencyInterfaceType, dependencies[0])
-			container.RegisterInstance(DependencyInterfaceType, dependencies[1])
-			err := container.RegisterConstructor(NewVariadic)
-			Expect(err).To(BeNil())
-
-			instance, err := container.Resolve(AggregateInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
-			_, ok := instance.(AggregateInterface)
-			Expect(ok).To(BeTrue())
-		})
-		It("can register map parameter", func() {
-			container := di.NewContainer()
-			dependencies := []*SampleStruct{
-				{name: "sample 1"},
-				{name: "sample 2"},
-			}
-			for _, d := range dependencies {
-				container.RegisterInstance(DependencyInterfaceType, d, di.WithName(d.Name()))
-			}
-			err := container.RegisterConstructor(NewMap)
-			Expect(err).To(BeNil())
-
-			instance, err := container.Resolve(MapInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
-
-			mapInstance, ok := instance.(MapInterface)
-			Expect(ok).To(BeTrue())
-			Expect(len(mapInstance.Keys())).To(Equal(2))
-		})
-		It("returns empty map when no keys specified", func() {
-			container := di.NewContainer()
-			dependencies := []*SampleStruct{
-				{name: "sample 1"},
-				{name: "sample 2"},
-			}
-			for _, d := range dependencies {
-				container.RegisterInstance(DependencyInterfaceType, d)
-			}
-			err := container.RegisterConstructor(NewMap)
-			Expect(err).To(BeNil())
-
-			instance, err := container.Resolve(MapInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
-
-			mapInstance, ok := instance.(MapInterface)
-			Expect(ok).To(BeTrue())
-			Expect(len(mapInstance.Keys())).To(Equal(0))
-		})
-		It("can invoke constructor that returns error", func() {
-			container := di.NewContainer()
-
-			err := container.RegisterConstructor(NewWithError)
-			Expect(err).To(BeNil())
-
-			i, err := container.Resolve(SampleInterfaceType)
-			Expect(err).ToNot(BeNil())
-			Expect(i).To(BeNil())
-		})
-		It("can invoke constructor that returns value and nil error", func() {
-			container := di.NewContainer()
-
-			err := container.RegisterConstructor(NewWithNilError)
-			Expect(err).To(BeNil())
-
-			i, err := container.Resolve(SampleInterfaceType)
-			Expect(err).To(BeNil())
-			Expect(i).ToNot(BeNil())
-
-			_, ok := i.(SampleInterface)
-			Expect(ok).To(BeTrue())
-		})
-		It("throws error when second return type is not error", func() {
-			container := di.NewContainer()
-			err := container.RegisterConstructor(TwoReturnTypes)
-			Expect(err).ToNot(BeNil())
-		})
-		It("throws error when no return type", func() {
-			container := di.NewContainer()
-			err := container.RegisterConstructor(func() {})
-			Expect(err).ToNot(BeNil())
-		})
+		sample, ok := instance.(SampleInterface)
+		require.True(t, ok)
+		require.Equal(t, name, sample.Name())
 	})
-	It("can resolve all", func() {
+	t.Run("array parameter", func(t *testing.T) {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
+		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
+		err := container.RegisterConstructor(NewAggregate)
+		require.NoError(t, err)
+
+		instance, err := container.Resolve(AggregateInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+		a, ok := instance.(AggregateInterface)
+		require.True(t, ok)
+		require.NotNil(t, a)
+		require.Equal(t, 2, len(a.Names()))
+	})
+	t.Run("variadic", func(t *testing.T) {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		container.RegisterInstance(DependencyInterfaceType, dependencies[0])
+		container.RegisterInstance(DependencyInterfaceType, dependencies[1])
+		err := container.RegisterConstructor(NewVariadic)
+		require.NoError(t, err)
+
+		instance, err := container.Resolve(AggregateInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+		_, ok := instance.(AggregateInterface)
+		require.True(t, ok)
+	})
+	t.Run("func", func(t *testing.T) {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		for _, d := range dependencies {
+			container.RegisterInstance(DependencyInterfaceType, d, di.WithName(d.Name()))
+		}
+		err := container.RegisterConstructor(NewMap)
+		require.NoError(t, err)
+
+		instance, err := container.Resolve(MapInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+
+		mapInstance, ok := instance.(MapInterface)
+		require.True(t, ok)
+		require.Equal(t, 2, len(mapInstance.Keys()))
+	})
+	t.Run("no keys", func(t *testing.T) {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		for _, d := range dependencies {
+			container.RegisterInstance(DependencyInterfaceType, d)
+		}
+		err := container.RegisterConstructor(NewMap)
+		require.NoError(t, err)
+
+		instance, err := container.Resolve(MapInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+
+		mapInstance, ok := instance.(MapInterface)
+		require.True(t, ok)
+		require.Equal(t, 0, len(mapInstance.Keys()))
+	})
+	t.Run("err ret", func(t *testing.T) {
+		container := di.NewContainer()
+
+		err := container.RegisterConstructor(NewWithError)
+		require.NoError(t, err)
+
+		i, err := container.Resolve(SampleInterfaceType)
+		require.NotNil(t, err)
+		require.Nil(t, i)
+	})
+	t.Run("value err ret", func(t *testing.T) {
+
+		container := di.NewContainer()
+
+		err := container.RegisterConstructor(NewWithNilError)
+		require.NoError(t, err)
+
+		i, err := container.Resolve(SampleInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, i)
+
+		_, ok := i.(SampleInterface)
+		require.True(t, ok)
+	})
+	t.Run("error must be last", func(t *testing.T) {
+		container := di.NewContainer()
+		err := container.RegisterConstructor(TwoReturnTypes)
+		require.NotNil(t, err)
+	})
+	t.Run("must have return type", func(t *testing.T) {
+		container := di.NewContainer()
+		err := container.RegisterConstructor(func() {})
+		require.NotNil(t, err)
+	})
+	t.Run("resolve all", func(t *testing.T) {
 		container := di.NewContainer()
 		container.RegisterInstance(SampleInterfaceType, NewSample("one"))
 		container.RegisterInstance(SampleInterfaceType, NewSample("two"))
 		all, err := container.ResolveAll(SampleInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(len(all)).To(Equal(2))
+		require.NoError(t, err)
+		require.Equal(t, 2, len(all))
 	})
-	It("can resolve map", func() {
+	t.Run("resolve map", func(t *testing.T) {
 		container := di.NewContainer()
 		keys := []string{"one", "two"}
 		for _, key := range keys {
 			container.RegisterInstance(SampleInterfaceType, NewSample(key), di.WithName(key))
 		}
 		m, err := container.ResolveMap(SampleInterfaceType)
-		Expect(err).To(BeNil())
-		Expect(len(m)).To(Equal(len(keys)))
+		require.NoError(t, err)
+		require.Equal(t, len(keys), len(m))
 	})
-	Context("key", func() {
-		It("can resolve by key", func() {
-			container := di.NewContainer()
-			container.RegisterInstance(SampleInterfaceType, NewSample("one"), di.WithName("one"))
-			container.RegisterInstance(SampleInterfaceType, NewSample("two"), di.WithName("two"))
-			instance, err := container.ResolveByName(SampleInterfaceType, "two")
-			Expect(err).To(BeNil())
-			Expect(instance).ToNot(BeNil())
-		})
+	t.Run("resolve by key", func(t *testing.T) {
+		container := di.NewContainer()
+		container.RegisterInstance(SampleInterfaceType, NewSample("one"), di.WithName("one"))
+		container.RegisterInstance(SampleInterfaceType, NewSample("two"), di.WithName("two"))
+		instance, err := container.ResolveByName(SampleInterfaceType, "two")
+		require.NoError(t, err)
+		require.NotNil(t, instance)
 	})
-	Context("lifetime", func() {
-		var (
+	t.Run("lifetime", func(t *testing.T) {
+		type test struct {
+			name      string
 			container di.Container
-		)
-		It("can register default lifetime", func() {
-			container = di.NewContainer(di.WithDefaultLifetime(di.LifetimeStatic))
-			err := container.RegisterConstructor(NewStorage)
-			Expect(err).To(BeNil())
-		})
-		It("can register lifetime", func() {
-			container = di.NewContainer()
-			err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
-			Expect(err).To(BeNil())
-		})
-		It("can override default lifetime", func() {
-			container = di.NewContainer(di.WithDefaultLifetime(di.LifetimePerRequest))
-			err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
-			Expect(err).To(BeNil())
-		})
-		AfterEach(func() {
-			obj, err := container.Resolve(StorageType)
-			Expect(err).To(BeNil())
+		}
+		tests := []test{
+			{"can register default lifetime",
+				func() di.Container {
+					container := di.NewContainer(di.WithDefaultLifetime(di.LifetimeStatic))
+					err := container.RegisterConstructor(NewStorage)
+					require.NoError(t, err)
+					return container
+				}()},
+			{"can register lifetime",
+				func() di.Container {
+					container := di.NewContainer()
+					err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
+					require.NoError(t, err)
+					return container
+				}()},
+			{"can override default lifetime", func() di.Container {
+				container := di.NewContainer(di.WithDefaultLifetime(di.LifetimePerRequest))
+				err := container.RegisterConstructor(NewStorage, di.WithLifetime(di.LifetimeStatic))
+				require.NoError(t, err)
+				return container
+			}()},
+		}
+		for _, test := range tests {
+			obj, err := test.container.Resolve(StorageType)
+			require.NoError(t, err)
 
 			storage, ok := obj.(Storage)
-			Expect(ok).To(BeTrue())
+			require.True(t, ok)
 			storage.Set(1, "test")
 
-			obj, err = container.Resolve(StorageType)
-			Expect(err).To(BeNil())
+			obj, err = test.container.Resolve(StorageType)
+			require.NoError(t, err)
 
 			storage, ok = obj.(Storage)
-			Expect(ok).To(BeTrue())
+			require.True(t, ok)
 
 			value := storage.Get(1)
-			Expect(value).To(Equal("test"))
-		})
+			require.Equal(t, "test", value)
+		}
 	})
-})
+	t.Run("remove all", func(t *testing.T) {
+		names := []string{"one", "two", "three"}
+		container := di.NewContainer()
+		for _, name := range names {
+			name := name
+			container.RegisterInstance(
+				SampleInterfaceType,
+				NewSample(name),
+				di.WithName(name))
+		}
+
+		all, err := container.ResolveAll(SampleInterfaceType)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(all))
+
+		container.RemoveAll(SampleInterfaceType)
+
+		_, err = container.ResolveAll(SampleInterfaceType)
+		require.Error(t, err)
+	})
+	t.Run("replace", func(t *testing.T) {
+		names := []string{"one", "two", "three"}
+		container := di.NewContainer()
+		for _, name := range names {
+			name := name
+			container.RegisterInstance(
+				SampleInterfaceType,
+				NewSample(name),
+				di.WithName(name))
+		}
+
+		all, err := container.ResolveAll(SampleInterfaceType)
+		require.NoError(t, err)
+		require.Equal(t, 3, len(all))
+		container.ReplaceInstance(SampleInterfaceType, NewSample("four"))
+
+		all, err = container.ResolveAll(SampleInterfaceType)
+		require.NoError(t, err)
+		require.Equal(t, 1, len(all))
+	})
+}

@@ -15,7 +15,14 @@ func RegisterInstance[T any](container Container, instance T, options ...Instanc
 func RegisterDynamic[T any](container Container, delegate func(Resolver) (T, error), options ...InstanceRegistrationOption) {
 	t := reflect.TypeOf((*T)(nil)).Elem()
 
-	container.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
+	container.RegisterDynamic(t, func(r Resolver) (any, error) {
+		return delegate(r)
+	}, options...)
+}
+
+func ReplaceDynamic[T any](container Container, delegate func(Resolver) (T, error), options ...InstanceRegistrationOption) {
+	t := reflect.TypeOf((*T)(nil)).Elem()
+	container.ReplaceDynamic(t, func(r Resolver) (any, error) {
 		return delegate(r)
 	}, options...)
 }
@@ -28,9 +35,9 @@ func Resolve[T any](resolver Resolver) (T, error) {
 	if err != nil {
 		return zero, err
 	}
-	cast, ok := instance.(T)
-	if !ok {
-		return zero, fmt.Errorf("Unable to cast instance to %s", t.String())
+	cast, err := cast[T](t, instance)
+	if err != nil {
+		return zero, err
 	}
 	return cast, nil
 }
@@ -43,9 +50,9 @@ func ResolveByName[T any](resolver Resolver, name string) (T, error) {
 	if err != nil {
 		return zero, err
 	}
-	cast, ok := instance.(T)
-	if !ok {
-		return zero, fmt.Errorf("Unable to cast instance to %s", t.String())
+	cast, err := cast[T](t, instance)
+	if err != nil {
+		return zero, err
 	}
 	return cast, nil
 }
@@ -59,11 +66,20 @@ func ResolveAll[T any](resolver Resolver) ([]T, error) {
 
 	casts := []T{}
 	for _, instance := range instances {
-		cast, ok := instance.(T)
-		if !ok {
-			return nil, fmt.Errorf("Unable to cast instance to %s", t.String())
+		cast, err := cast[T](t, instance)
+		if err != nil {
+			return nil, err
 		}
 		casts = append(casts, cast)
 	}
 	return casts, nil
+}
+
+func cast[T any](t reflect.Type, instance any) (T, error) {
+	var zero T
+	cast, ok := instance.(T)
+	if !ok {
+		return zero, fmt.Errorf("unable to cast instance to %s", t.String())
+	}
+	return cast, nil
 }

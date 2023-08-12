@@ -21,19 +21,28 @@ var (
 // Container represents a dependency injection container
 type Container interface {
 	// RegisterInstance registers a type with a single instace with the given registration options
-	RegisterInstance(t reflect.Type, instance interface{}, options ...InstanceRegistrationOption)
+	RegisterInstance(t reflect.Type, instance any, options ...InstanceRegistrationOption)
 
 	// RegisterDynamic registers a type with a dynamic resolver
 	RegisterDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption)
 
 	// RegisterConstructor registers a type dynamically by instpecting the constructor signature
-	RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error
+	RegisterConstructor(constructor any, options ...InstanceRegistrationOption) error
+
+	// ReplaceDynamic removes all instances and resplaces them with the given dynamic resolver
+	ReplaceDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption)
+
+	// ReplaceInstance removes all instances and replaces it with the given instance
+	ReplaceInstance(t reflect.Type, instance any, options ...InstanceRegistrationOption)
+
+	// RemoveAll
+	RemoveAll(t reflect.Type)
 
 	// Resolver is required as a Container must allow resolution
 	Resolver
 }
 
-type FuncResolver func(Resolver) (interface{}, error)
+type FuncResolver func(Resolver) (any, error)
 
 type registrationOption struct {
 	name     string
@@ -43,12 +52,12 @@ type registrationOption struct {
 }
 
 type containerItem struct {
-	data   interface{}
+	data   any
 	err    error
 	option *registrationOption
 }
 
-func (i *containerItem) resolve(r Resolver) (interface{}, error) {
+func (i *containerItem) resolve(r Resolver) (any, error) {
 
 	// was the error cached?
 	if i.err != nil {
@@ -117,14 +126,14 @@ func NewContainer(options ...DefaultRegistrationOption) Container {
 	}
 }
 
-func (c *container) RegisterConstructor(constructor interface{}, options ...InstanceRegistrationOption) error {
+func (c *container) RegisterConstructor(constructor any, options ...InstanceRegistrationOption) error {
 	t := reflect.TypeOf(constructor)
 	err := validateDelegateTypeIsConstructor(c, t)
 	if err != nil {
 		return err
 	}
 
-	delegate := func(r Resolver) (interface{}, error) {
+	delegate := func(r Resolver) (any, error) {
 		return Invoke(r, constructor)
 	}
 
@@ -192,10 +201,25 @@ func (c *container) RegisterDynamic(t reflect.Type, delegate FuncResolver, optio
 	}
 }
 
-func (c *container) RegisterInstance(t reflect.Type, instance interface{}, options ...InstanceRegistrationOption) {
-	c.RegisterDynamic(t, func(r Resolver) (interface{}, error) {
+func (c *container) RegisterInstance(t reflect.Type, instance any, options ...InstanceRegistrationOption) {
+	c.RegisterDynamic(t, func(r Resolver) (any, error) {
 		return instance, nil
 	}, options...)
+}
+
+func (c *container) ReplaceDynamic(t reflect.Type, delegate FuncResolver, options ...InstanceRegistrationOption) {
+	c.RemoveAll(t)
+	c.RegisterDynamic(t, delegate, options...)
+}
+
+func (c *container) ReplaceInstance(t reflect.Type, instance any, options ...InstanceRegistrationOption) {
+	c.RemoveAll(t)
+	c.RegisterInstance(t, instance, options...)
+}
+
+func (c *container) RemoveAll(t reflect.Type) {
+	key := t.String()
+	delete(c.groups, key)
 }
 
 func (c *container) group(t reflect.Type) (*containerItemGroup, error) {
@@ -207,7 +231,7 @@ func (c *container) group(t reflect.Type) (*containerItemGroup, error) {
 	return group, nil
 }
 
-func (c *container) Resolve(t reflect.Type) (interface{}, error) {
+func (c *container) Resolve(t reflect.Type) (any, error) {
 	results, err := c.ResolveAll(t)
 	if err != nil {
 		return nil, err
@@ -215,7 +239,7 @@ func (c *container) Resolve(t reflect.Type) (interface{}, error) {
 	return results[0], nil
 }
 
-func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, error) {
+func (c *container) ResolveByName(t reflect.Type, name string) (any, error) {
 	group, err := c.group(t)
 	if err != nil {
 		return nil, err
@@ -227,14 +251,14 @@ func (c *container) ResolveByName(t reflect.Type, name string) (interface{}, err
 	return item.resolve(c)
 }
 
-func (c *container) ResolveAll(t reflect.Type) ([]interface{}, error) {
+func (c *container) ResolveAll(t reflect.Type) ([]any, error) {
 	group, err := c.group(t)
 	if err != nil {
 		return nil, err
 	}
 
 	// loop over the group named instances and collect
-	var all []interface{}
+	var all []any
 	for _, v := range group.namedItems {
 		data, err := v.resolve(c)
 		if err != nil {
@@ -253,13 +277,13 @@ func (c *container) ResolveAll(t reflect.Type) ([]interface{}, error) {
 	return all, nil
 }
 
-func (c *container) ResolveMap(t reflect.Type) (map[string]interface{}, error) {
+func (c *container) ResolveMap(t reflect.Type) (map[string]any, error) {
 	group, err := c.group(t)
 	if err != nil {
 		return nil, err
 	}
 
-	result := map[string]interface{}{}
+	result := map[string]any{}
 	for k, v := range group.namedItems {
 		data, err := v.resolve(c)
 		if err != nil {
