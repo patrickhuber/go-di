@@ -88,4 +88,15 @@ func TestGeneric(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, instance)
 	})
+	t.Run("can resolve zero value struct", func(t *testing.T) {
+		type Concrete struct {
+			Value bool
+		}
+		container := di.NewContainer()
+		di.RegisterInstance(container, Concrete{})
+		instance, err := di.Resolve[Concrete](container)
+
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+	})
 }

@@ -55,4 +55,16 @@ func TestInvoke(t *testing.T) {
 	t.Run("can invoke with error in return", func(t *testing.T) {})
 	t.Run("fails when error is not second return type", func(t *testing.T) {})
 	t.Run("throws error with no return type", func(t *testing.T) {})
+	t.Run("can resolve zero value from function", func(t *testing.T) {
+		type MyStruct struct{}
+		container := di.NewContainer()
+		myFunction := func() MyStruct {
+			return MyStruct{}
+		}
+		container.RegisterConstructor(myFunction)
+		_, err := di.Invoke(container, func(myStruct MyStruct) {
+
+		})
+		require.NoError(t, err)
+	})
 }

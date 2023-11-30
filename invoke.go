@@ -23,6 +23,8 @@ func Invoke(resolver Resolver, delegate any) (any, error) {
 	var instance any
 	if !results[0].IsZero() {
 		instance = results[0].Interface()
+	} else {
+		instance = reflect.Zero(results[0].Type()).Interface()
 	}
 
 	if len(results) == 2 {
