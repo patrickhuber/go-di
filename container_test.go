@@ -264,6 +264,36 @@ func TestConstructor(t *testing.T) {
 		require.True(t, ok)
 		require.Equal(t, 0, len(mapInstance.Keys()))
 	})
+	t.Run("mix keyed and unkeyed", func(t *testing.T) {
+		container := di.NewContainer()
+		dependencies := []*SampleStruct{
+			{name: "sample 1"},
+			{name: "sample 2"},
+		}
+		for _, d := range dependencies {
+			container.RegisterInstance(DependencyInterfaceType, d, di.WithName(d.Name()))
+		}
+		const sample3Name = "sample 3"
+		container.RegisterInstance(DependencyInterfaceType, &SampleStruct{name: sample3Name})
+		err := container.RegisterConstructor(NewMap)
+		require.NoError(t, err)
+
+		instance, err := container.Resolve(MapInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, instance)
+
+		mapInstance, ok := instance.(MapInterface)
+		require.True(t, ok)
+		require.Equal(t, 2, len(mapInstance.Keys()))
+
+		singleInstance, err := container.Resolve(DependencyInterfaceType)
+		require.NoError(t, err)
+		require.NotNil(t, singleInstance)
+
+		sample3, ok := singleInstance.(DependencyInterface)
+		require.True(t, ok)
+		require.Equal(t, "sample 3", sample3.Name())
+	})
 	t.Run("err ret", func(t *testing.T) {
 		container := di.NewContainer()
 
