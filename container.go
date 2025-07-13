@@ -232,11 +232,24 @@ func (c *container) group(t reflect.Type) (*containerItemGroup, error) {
 }
 
 func (c *container) Resolve(t reflect.Type) (any, error) {
-	results, err := c.ResolveAll(t)
+	// resolve should only resolve the last registered instance if no unnamed instances are registered
+	group, err := c.group(t)
 	if err != nil {
 		return nil, err
 	}
-	return results[0], nil
+	// first check if there are unnamed items, if so return the last one
+	if len(group.items) > 0 {
+		lastIndex := len(group.items) - 1
+		return group.items[lastIndex].resolve(c)
+	}
+	// next check if there are named items, if so return the last one
+	if len(group.namedItems) > 0 {
+		for _, item := range group.namedItems {
+			return item.resolve(c)
+		}
+	}
+	// otherwise return an error
+	return nil, fmt.Errorf("%w: '%s'", ErrNotExist, t.String())
 }
 
 func (c *container) ResolveByName(t reflect.Type, name string) (any, error) {

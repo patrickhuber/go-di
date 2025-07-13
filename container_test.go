@@ -292,7 +292,7 @@ func TestConstructor(t *testing.T) {
 
 		sample3, ok := singleInstance.(DependencyInterface)
 		require.True(t, ok)
-		require.Equal(t, "sample 3", sample3.Name())
+		require.Equal(t, sample3Name, sample3.Name())
 	})
 	t.Run("err ret", func(t *testing.T) {
 		container := di.NewContainer()
